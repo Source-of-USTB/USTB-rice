@@ -2,7 +2,7 @@
 
 [English](./README.md)
 
-Source-of-USTB 系统美化大赛站点。
+Source-of-USTB 系统美化大赛站点。前端 Nuxt 4 + Nuxt UI，登录、数据库和图片存储都用 Supabase。
 
 每位参赛者提交一份美化过程说明和若干张截图。比赛分两个阶段：
 
@@ -13,54 +13,64 @@ Source-of-USTB 系统美化大赛站点。
 
 ```txt
 /           作品墙
-/login      登录
+/login      登录 / 注册
+/confirm    OAuth 与邮件链接的回跳页
 /u/[id]     某位同学的作品
 /me         管理自己的作品
 /rank       排行榜
 ```
 
+## 初始化
+
+1. 建一个 Supabase 项目。
+2. 把 `supabase/schema.sql` 在 SQL Editor 里整段跑一次。它会建好表、RLS 策略、触发器和存储桶，脚本是幂等的，改完重跑也没问题。
+3. 复制 `.env.example` 为 `.env`，填入 Project Settings → API 里的项目地址和 publishable key。首次 `pnpm dev` 时如果 `.env` 不存在会自动帮你生成一份。
+4. `pnpm install && pnpm dev`
+
+比赛规则存在 `contest_settings` 那一行里，不在代码里。开放投票：
+
+```sql
+update public.contest_settings set phase = 'voting' where id = 1;
+```
+
+指定评委（让对方先登录一次，拿到 uuid 之后）：
+
+```sql
+update public.profiles set role = 'judge' where id = '<对方的 uuid>';
+```
+
 ## 项目结构
 
 ```txt
+supabase/schema.sql            建表、RLS 策略、触发器、存储桶
 app/pages/                     页面路由
 app/components/                公共组件
-app/composables/               比赛状态与数据读写
-app/types/contest.ts           数据模型
-app/utils/contest-seed.ts      比赛规则与假数据
-public/mock/                   截图占位图
+app/composables/               取数与写操作
+app/types/contest.ts           领域模型
+app/types/database.ts          表结构类型，与 schema.sql 对应
+scripts/setup-env.mjs          .env 缺失时从 .env.example 生成
 ```
 
-## 本地开发
-
-```bash
-pnpm install
-pnpm dev
-```
-
-注意：
-
-- 目前还没有接入 Supabase，数据都在内存里（`app/composables/useContestStore.ts`），刷新即重置。
-- 数据模型已经按将来的表来设计：`profiles`、`works`、`work_photos`、`votes`。
-- `app/components/DevToolbar.vue` 是页脚的开发用开关，可以切换比赛阶段和登录身份，上线前删掉。
+`useContestData` 一次把数据全取回来，每个写操作完成后调 `refresh()`。社团规模的比赛这样够用，也省得维护一堆增量状态。
 
 ## 环境变量
-
-复制 `.env.example` 为 `.env`：
 
 ```txt
 SUPABASE_URL=
 SUPABASE_KEY=
 ```
 
-`SUPABASE_KEY` 是 anon key，它本来就会打进前端产物，不属于机密——真正保护数据的是行级安全策略，所以每张表都要开启 RLS 并写好策略。
+`SUPABASE_KEY` 是 publishable key，它本来就会打进前端产物，不属于机密——真正保护数据的是行级安全策略，`schema.sql` 里已经配好了。`SUPABASE_SERVICE_KEY` 会绕过 RLS，只能在服务端使用，绝对不要提交。
+
+所有规则在数据库里都再挡了一遍。前端的禁用状态只是顺手，策略和触发器才是边界。单张选票只有投票本人能看见，票数通过 `work_scores` 聚合视图公开。
 
 ## 计分方式
 
 ```txt
-综合分 = 人气分 * 40% + 评委分 * 60%
+综合分 = 人气分 * popular_weight + 评委分 * judge_weight
 ```
 
-人气分按当前最高票归一化，评委分取所有评委打分的平均值。截图数量、说明字数、每人票数和权重都在 `CONTEST_CONFIG` 里。
+人气分按当前最高票归一化，评委分取所有评委打分的平均值。两个权重、截图张数上限、说明字数和每人票数都来自 `contest_settings`。
 
 ## 构建
 
