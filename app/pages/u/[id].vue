@@ -1,12 +1,12 @@
 <script setup lang="ts">
 const route = useRoute()
-const { profiles } = useContestStore()
+const { snapshot } = useContestData()
 const { entryByAuthor } = useWorks()
 const { isVoting } = useContest()
 const { user, isJudge } = useAuth()
 
 const userId = computed(() => String(route.params.id))
-const profile = computed(() => profiles.value.find(item => item.id === userId.value) ?? null)
+const profile = computed(() => snapshot.value.profiles.find(item => item.id === userId.value) ?? null)
 const entry = computed(() => entryByAuthor(userId.value))
 const isMe = computed(() => user.value?.id === userId.value)
 
@@ -66,9 +66,6 @@ useSeoMeta({
                 size="sm"
               />
             </div>
-            <p class="m-0 text-muted">
-              {{ profile.bio }}
-            </p>
           </div>
         </div>
 

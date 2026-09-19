@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { ActionResult } from '~/types/contest'
+
 useSeoMeta({
   title: '我的作品',
   description: '提交你的桌面美化作品。'
@@ -12,10 +14,20 @@ const { myEntry, saveMyText, deleteMyText, addMyPhotos, removeMyPhoto, setMyCove
 const photos = computed(() => myEntry.value?.photos ?? [])
 const hasText = computed(() => Boolean(myEntry.value?.work.title || myEntry.value?.work.description))
 
+function report(result: ActionResult) {
+  toast.add({
+    title: result.message,
+    color: result.ok ? 'success' : 'warning',
+    icon: result.ok ? 'i-lucide-circle-check' : 'i-lucide-circle-alert'
+  })
+  return result
+}
+
 /* --------------------------- 作品说明 (一份文本) --------------------------- */
 
 const editing = ref(false)
 const confirmDelete = ref(false)
+const saving = ref(false)
 const draft = reactive({
   title: '',
   description: '',
@@ -34,25 +46,20 @@ function cancelEdit() {
   editing.value = false
 }
 
-function onSave() {
-  const result = saveMyText({ title: draft.title, description: draft.description, tags: draft.tags })
-  toast.add({
-    title: result.message,
-    color: result.ok ? 'success' : 'warning',
-    icon: result.ok ? 'i-lucide-circle-check' : 'i-lucide-circle-alert'
-  })
+async function onSave() {
+  saving.value = true
+  const result = report(await saveMyText({ title: draft.title, description: draft.description, tags: draft.tags }))
+  saving.value = false
+
   if (result.ok) {
     editing.value = false
   }
 }
 
-function onDeleteText() {
-  const result = deleteMyText()
-  toast.add({
-    title: result.message,
-    color: result.ok ? 'success' : 'warning',
-    icon: result.ok ? 'i-lucide-circle-check' : 'i-lucide-circle-alert'
-  })
+async function onDeleteText() {
+  saving.value = true
+  report(await deleteMyText())
+  saving.value = false
   confirmDelete.value = false
   editing.value = false
 }
@@ -61,47 +68,41 @@ function onDeleteText() {
 
 const fileInput = useTemplateRef<HTMLInputElement>('fileInput')
 const dragging = ref(false)
+const uploading = ref(false)
+const busyPhotoId = ref<string | null>(null)
 
-function handleFiles(files: File[]) {
+async function handleFiles(files: File[]) {
   if (files.length === 0) {
     return
   }
-  const result = addMyPhotos(files)
-  toast.add({
-    title: result.message,
-    color: result.ok ? 'success' : 'warning',
-    icon: result.ok ? 'i-lucide-circle-check' : 'i-lucide-circle-alert'
-  })
+  uploading.value = true
+  report(await addMyPhotos(files))
+  uploading.value = false
 }
 
 function onPick(event: Event) {
   const input = event.target as HTMLInputElement
-  handleFiles(Array.from(input.files ?? []))
-  // 清空以便连续选择同一个文件
+  const files = Array.from(input.files ?? [])
+  // 先清空, 这样连续选同一个文件也能触发 change
   input.value = ''
+  void handleFiles(files)
 }
 
 function onDrop(event: DragEvent) {
   dragging.value = false
-  handleFiles(Array.from(event.dataTransfer?.files ?? []))
+  void handleFiles(Array.from(event.dataTransfer?.files ?? []))
 }
 
-function onRemovePhoto(photoId: string) {
-  const result = removeMyPhoto(photoId)
-  toast.add({
-    title: result.message,
-    color: result.ok ? 'success' : 'warning',
-    icon: result.ok ? 'i-lucide-circle-check' : 'i-lucide-circle-alert'
-  })
+async function onRemovePhoto(photoId: string) {
+  busyPhotoId.value = photoId
+  report(await removeMyPhoto(photoId))
+  busyPhotoId.value = null
 }
 
-function onSetCover(photoId: string) {
-  const result = setMyCover(photoId)
-  toast.add({
-    title: result.message,
-    color: result.ok ? 'success' : 'warning',
-    icon: result.ok ? 'i-lucide-circle-check' : 'i-lucide-circle-alert'
-  })
+async function onSetCover(photoId: string) {
+  busyPhotoId.value = photoId
+  report(await setMyCover(photoId))
+  busyPhotoId.value = null
 }
 </script>
 
@@ -143,7 +144,7 @@ function onSetCover(photoId: string) {
             name="i-lucide-lock"
             class="mt-0.5 size-4 shrink-0"
           />
-          <span>已经进入投票阶段, 作品锁定了, 说明和截图都改不了。投票 {{ config.votingDeadline }} 结束。</span>
+          <span>已经进入投票阶段, 作品锁定了, 说明和截图都改不了。投票 {{ formatDeadline(config.votingDeadline) }} 结束。</span>
         </p>
 
         <!-- 作品说明: 每人只有一份 -->
@@ -209,12 +210,12 @@ function onSetCover(photoId: string) {
             <UFormField
               label="说明正文"
               name="description"
-              :hint="`${draft.description.length} / ${config.maxDescriptionLength}`"
+              :hint="`${draft.description.length} / ${config.maxDescription}`"
             >
               <UTextarea
                 v-model="draft.description"
                 :rows="10"
-                :maxlength="config.maxDescriptionLength"
+                :maxlength="config.maxDescription"
                 placeholder="介绍一下你的配色思路、用到的窗口管理器和插件, 以及最得意的细节。"
                 class="w-full"
               />
@@ -225,6 +226,7 @@ function onSetCover(photoId: string) {
                 type="submit"
                 label="保存"
                 icon="i-lucide-check"
+                :loading="saving"
               />
               <UButton
                 label="取消"
@@ -302,8 +304,9 @@ function onSetCover(photoId: string) {
             @drop.prevent="onDrop"
           >
             <UIcon
-              name="i-lucide-image-plus"
+              :name="uploading ? 'i-lucide-loader-circle' : 'i-lucide-image-plus'"
               class="size-8 text-dimmed"
+              :class="uploading ? 'animate-spin' : ''"
             />
             <p class="m-0 text-sm text-toned">
               把截图拖进来, 或者
@@ -368,6 +371,7 @@ function onSetCover(photoId: string) {
                   size="xs"
                   color="neutral"
                   variant="solid"
+                  :loading="busyPhotoId === photo.id"
                   @click="onSetCover(photo.id)"
                 />
                 <UButton
@@ -376,6 +380,7 @@ function onSetCover(photoId: string) {
                   size="xs"
                   color="error"
                   variant="solid"
+                  :loading="busyPhotoId === photo.id"
                   @click="onRemovePhoto(photo.id)"
                 />
               </figcaption>
@@ -409,6 +414,7 @@ function onSetCover(photoId: string) {
               label="确认删除"
               color="error"
               icon="i-lucide-trash-2"
+              :loading="saving"
               @click="onDeleteText()"
             />
           </div>

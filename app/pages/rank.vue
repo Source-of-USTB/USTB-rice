@@ -47,7 +47,7 @@ const photoTotal = computed(() => entries.value.reduce((sum, entry) => sum + ent
       class="flex flex-col gap-10"
     >
       <p class="m-0 text-muted">
-        现在还是上传阶段, {{ config.uploadDeadline }} 截止收稿, 之后才会开放投票并公布排名。
+        现在还是上传阶段, {{ formatDeadline(config.uploadDeadline) }} 截止收稿, 之后才会开放投票并公布排名。
       </p>
 
       <div class="flex flex-wrap gap-x-16 gap-y-6">
@@ -60,7 +60,7 @@ const photoTotal = computed(() => entries.value.reduce((sum, entry) => sum + ent
           <span class="text-sm text-muted">截图总数</span>
         </div>
         <div class="flex flex-col gap-1">
-          <span class="text-3xl leading-none font-bold tabular-nums text-highlighted">{{ config.uploadDeadline }}</span>
+          <span class="text-xl leading-tight font-bold tabular-nums text-highlighted">{{ formatDeadline(config.uploadDeadline) }}</span>
           <span class="text-sm text-muted">投票开放时间</span>
         </div>
       </div>

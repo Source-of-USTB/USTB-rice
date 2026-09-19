@@ -6,13 +6,17 @@ const props = defineProps<{
 }>()
 
 const toast = useToast()
-const { config } = useContest()
+const { config, votingOpen } = useContest()
 const { setJudgeScore } = useWorks()
 
-const scores = computed(() => Array.from({ length: config.judgeMaxScore }, (_, index) => index + 1))
+const pending = ref<number | null>(null)
+const scores = computed(() => Array.from({ length: config.value.judgeMaxScore }, (_, index) => index + 1))
 
-function onScore(score: number) {
-  const result = setJudgeScore(props.entry.work.id, score)
+async function onScore(score: number) {
+  pending.value = score
+  const result = await setJudgeScore(props.entry.work.id, score)
+  pending.value = null
+
   toast.add({
     title: result.message,
     color: result.ok ? 'success' : 'warning',
@@ -43,6 +47,8 @@ function onScore(score: number) {
         :label="String(score)"
         :color="entry.myJudgeScore === score ? 'primary' : 'neutral'"
         :variant="entry.myJudgeScore === score ? 'solid' : 'outline'"
+        :loading="pending === score"
+        :disabled="!votingOpen"
         size="sm"
         class="w-10 justify-center"
         @click="onScore(score)"

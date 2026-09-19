@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { entries } = useWorks()
+const { entries, loading } = useWorks()
 
 useSeoMeta({
   title: '作品墙',
@@ -64,7 +64,18 @@ const visibleEntries = computed(() => {
       </div>
 
       <section
-        v-if="visibleEntries.length"
+        v-if="loading && !visibleEntries.length"
+        class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] items-start gap-6"
+      >
+        <USkeleton
+          v-for="placeholder in 6"
+          :key="placeholder"
+          class="h-72 rounded-xl"
+        />
+      </section>
+
+      <section
+        v-else-if="visibleEntries.length"
         class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,320px),1fr))] items-start gap-6"
       >
         <WorkCard

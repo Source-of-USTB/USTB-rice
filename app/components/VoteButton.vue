@@ -10,12 +10,18 @@ const props = withDefaults(defineProps<{
 
 const toast = useToast()
 const { user } = useAuth()
+const { votingOpen } = useContest()
 const { toggleUserVote } = useWorks()
 
+const pending = ref(false)
 const isMine = computed(() => props.entry.work.authorId === user.value?.id)
+const disabled = computed(() => isMine.value || !votingOpen.value)
 
-function onVote() {
-  const result = toggleUserVote(props.entry.work.id)
+async function onVote() {
+  pending.value = true
+  const result = await toggleUserVote(props.entry.work.id)
+  pending.value = false
+
   toast.add({
     title: result.message,
     color: result.ok ? 'success' : 'warning',
@@ -29,10 +35,11 @@ function onVote() {
     :size="size"
     :color="entry.votedByMe ? 'primary' : 'neutral'"
     :variant="entry.votedByMe ? 'solid' : 'outline'"
-    :disabled="isMine"
+    :disabled="disabled"
+    :loading="pending"
     icon="i-lucide-heart"
     :label="String(entry.userVotes)"
-    :title="isMine ? '不能给自己的作品投票' : entry.votedByMe ? '再次点击取消投票' : '投出一票'"
-    @click="onVote"
+    :title="isMine ? '不能给自己的作品投票' : !votingOpen ? '投票已经结束' : entry.votedByMe ? '再次点击取消投票' : '投出一票'"
+    @click="onVote()"
   />
 </template>

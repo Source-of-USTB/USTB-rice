@@ -14,6 +14,8 @@ useHead({
   }
 })
 
+const { snapshot } = useContestData()
+
 useSeoMeta({
   title,
   description,
@@ -29,6 +31,16 @@ useSeoMeta({
       <SiteHeader />
 
       <main class="mx-auto w-full max-w-shell flex-1 px-6 py-8 sm:px-8">
+        <UAlert
+          v-if="snapshot.loadError"
+          class="mb-8"
+          color="error"
+          variant="subtle"
+          icon="i-lucide-triangle-alert"
+          title="读取数据失败"
+          :description="`${snapshot.loadError} — 如果提示找不到表, 说明 supabase/schema.sql 还没在 Supabase 里执行过。`"
+        />
+
         <NuxtPage />
       </main>
 

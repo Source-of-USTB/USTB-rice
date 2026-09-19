@@ -1,24 +1,36 @@
-import type { ContestPhase } from '~/types/contest'
-
-/** 比赛阶段与规则. 组件里判断"现在能不能改作品 / 能不能投票"都走这里 */
+/** 比赛阶段与规则, 全部来自 contest_state 视图 */
 export function useContest() {
-  const { phase } = useContestStore()
+  const { snapshot } = useContestData()
+
+  const settings = computed(() => snapshot.value.settings)
+  const phase = computed(() => settings.value.phase)
 
   const isUpload = computed(() => phase.value === 'upload')
   const isVoting = computed(() => phase.value === 'voting')
 
-  const phaseLabel = computed(() => isUpload.value ? '上传阶段' : '投票阶段')
+  /** 进了投票阶段不等于还能投: 过了投票截止时间就关了 */
+  const votingOpen = computed(() => settings.value.votingOpen)
 
-  const phaseDescription = computed(() => isUpload.value
-    ? `现在可以提交作品, ${CONTEST_CONFIG.uploadDeadline} 截止收稿, 之后就改不了了。`
-    : `作品已经截稿, 给喜欢的桌面投一票吧, 投票在 ${CONTEST_CONFIG.votingDeadline} 结束。`)
+  const phaseLabel = computed(() => {
+    if (isUpload.value) {
+      return '上传阶段'
+    }
+    return votingOpen.value ? '投票阶段' : '投票已结束'
+  })
 
-  const deadline = computed(() => isUpload.value ? CONTEST_CONFIG.uploadDeadline : CONTEST_CONFIG.votingDeadline)
+  const deadline = computed(() => formatDeadline(isUpload.value
+    ? settings.value.uploadDeadline
+    : settings.value.votingDeadline))
 
-  /** 只给页脚的开发开关用, 正式环境由管理员在 Supabase 里改 */
-  function setPhase(next: ContestPhase) {
-    phase.value = next
-  }
+  const phaseDescription = computed(() => {
+    if (isUpload.value) {
+      return `现在可以提交作品, ${deadline.value || '收稿时间'} 截止, 之后就改不了了。`
+    }
+    if (votingOpen.value) {
+      return `作品已经截稿, 给喜欢的桌面投一票吧, 投票 ${deadline.value || ''} 结束。`
+    }
+    return '投票已经结束, 下面是最终结果。'
+  })
 
-  return { phase, isUpload, isVoting, phaseLabel, phaseDescription, deadline, setPhase, config: CONTEST_CONFIG }
+  return { settings, phase, isUpload, isVoting, votingOpen, phaseLabel, phaseDescription, deadline, config: settings }
 }
