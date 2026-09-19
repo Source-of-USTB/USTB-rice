@@ -2,17 +2,63 @@
 @import "@nuxt/ui";
 
 @theme static {
-  --font-sans: 'Public Sans', sans-serif;
+  /*
+   * Planet-Source-of-USTB 使用思源宋体作为全站字体, 这里沿用同一套字体观感.
+   * 字体文件体积较大 (单个 8MB), 暂时只声明字体栈, 若需要完全一致的效果,
+   * 可把 SourceHanSerifCN-*.woff2 放到 public/fonts/ 后在此处补上 @font-face.
+   */
+  --font-sans: "Source Han Serif SC", "Source Han Serif CN", "Noto Serif CJK SC", "Noto Serif SC", "Songti SC", "STSong", serif;
 
-  --color-green-50: #EFFDF5;
-  --color-green-100: #D9FBE8;
-  --color-green-200: #B3F5D1;
-  --color-green-300: #75EDAE;
-  --color-green-400: #00DC82;
-  --color-green-500: #00C16A;
-  --color-green-600: #00A155;
-  --color-green-700: #007F45;
-  --color-green-800: #016538;
-  --color-green-900: #0A5331;
-  --color-green-950: #052E16;
+  /* 页面主体宽度, 与参考站点的 1100px 保持一致 */
+  --container-shell: 1100px;
+
+  /* 主题色: 蓝 */
+  --color-blue-50: #EFF4FF;
+  --color-blue-100: #DBE6FE;
+  --color-blue-200: #BFD3FE;
+  --color-blue-300: #93B4FD;
+  --color-blue-400: #6090FA;
+  --color-blue-500: #3B6DF6;
+  --color-blue-600: #2450EB;
+  --color-blue-700: #1C3DD8;
+  --color-blue-800: #1D35AF;
+  --color-blue-900: #1D318A;
+  --color-blue-950: #162054;
+}
+
+@layer base {
+  /* 参考站点的正文行距偏松, 中文长文本更易读 */
+  body {
+    line-height: 1.6;
+  }
+}
+
+/*
+ * 深色模式底色.
+ *
+ * Nuxt UI 默认拿 neutral-900 (也就是 slate-900, #0F172A) 当深色背景, 它本身偏藏青,
+ * 和蓝色主题色叠在一起会发闷, 作品截图也压不住. 这里把底色换成接近中性的深灰,
+ * 并把 页面 / 卡片 / 悬浮 三层的明度差拉开, 让截图和蓝色强调色更跳出来.
+ *
+ * 写在 @layer 外面: 未分层的规则优先级高于 @nuxt/ui 里 @layer theme 的同名变量,
+ * 所以不用关心 import 顺序. 浅色模式保持 Nuxt UI 默认值不动.
+ */
+.dark {
+  --ui-bg: #0C0E12;
+  --ui-bg-muted: #111419;
+  --ui-bg-elevated: #171A21;
+  --ui-bg-accented: #232833;
+  --ui-bg-inverted: #F5F7FA;
+
+  --ui-border: #1E222B;
+  --ui-border-muted: #181C23;
+  --ui-border-accented: #2A303B;
+  --ui-border-inverted: #F5F7FA;
+
+  --ui-text-dimmed: #6E7685;
+  --ui-text-muted: #878F9D;
+  --ui-text-toned: #AAB2BF;
+  --ui-text: #CFD5DF;
+  --ui-text-highlighted: #FFFFFF;
+  --ui-text-inverted: #0C0E12;
 }
