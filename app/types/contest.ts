@@ -2,7 +2,7 @@
  * 数据模型.
  *
  * 字段命名刻意贴近后续 Supabase 的表结构 (profiles / works / work_photos / votes),
- * 现阶段由 app/composables/useContestData.ts 里的 mock store 提供数据,
+ * 现阶段由 app/composables/useContestStore.ts 里的 mock store 提供数据,
  * 接入 Supabase 时只需要替换该 store 的实现, 页面组件不用改.
  */
 
