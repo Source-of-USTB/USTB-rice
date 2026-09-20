@@ -436,6 +436,11 @@ create policy work_photos_delete_own on public.work_photos
     )
   );
 
+-- 管理员撤图的另一半: 只删 storage 里的文件会留下一条指向空地址的记录, 页面挂一张碎图.
+drop policy if exists work_photos_admin_delete on public.work_photos;
+create policy work_photos_admin_delete on public.work_photos
+  for delete to authenticated using (public.is_admin());
+
 -- votes: 只能看见自己投的; 票数走 work_scores 视图公开
 drop policy if exists votes_read_own on public.votes;
 create policy votes_read_own on public.votes
@@ -462,11 +467,25 @@ create policy votes_delete_own_user on public.votes
 
 
 -- --------------------------------------------------------------- 存储桶
--- 截图放在 work-photos 桶里, 每个人只能写自己 uid 命名的文件夹
--- TODO: 14
-insert into storage.buckets (id, name, public)
-values ('work-photos', 'work-photos', true)
-on conflict (id) do nothing;
+-- 截图放在 work-photos 桶里, 每个人只能写自己 uid 命名的文件夹.
+--
+-- 体积和类型在桶这一层就卡死. 桶是公开的, 里面的东西由 Supabase 项目域名直接吐给浏览器,
+-- 而那个域名上同时挂着 auth 接口 —— 放任别人传一个带脚本的 SVG 进来, 等于白送一个同源
+-- 执行入口. 白名单拦的是上传时声明的 Content-Type, 而对象发出去时用的也是这个值,
+-- 所以就算有人揣着 SVG 的字节谎报成 image/png, 浏览器拿到的也是 image/png, 解不出脚本.
+--
+-- do update 而不是 do nothing: 桶要是之前已经建过 (控制台点的, 或者旧版本脚本建的),
+-- do nothing 会让下面这几列永远落不了地.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'work-photos', 'work-photos', true,
+  10 * 1024 * 1024,
+  array['image/png', 'image/jpeg', 'image/webp']
+)
+on conflict (id) do update set
+  public             = excluded.public,
+  file_size_limit    = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
 
 drop policy if exists work_photos_object_read on storage.objects;
 create policy work_photos_object_read on storage.objects
@@ -483,7 +502,6 @@ create policy work_photos_object_insert on storage.objects
     and public.current_phase() = 'upload'
   );
 
--- TODO: 16
 drop policy if exists work_photos_object_delete on storage.objects;
 create policy work_photos_object_delete on storage.objects
   for delete to authenticated
@@ -492,6 +510,13 @@ create policy work_photos_object_delete on storage.objects
     and (storage.foldername(name))[1] = (select auth.uid())::text
     and public.current_phase() = 'upload'
   );
+
+-- 管理员撤下违规截图. 不看阶段: 投票期间发现问题也得能删.
+-- 同一条命令上的多条 permissive 策略是 or 关系, 这条只是在上面那条之外多开一个口子.
+drop policy if exists work_photos_object_admin_delete on storage.objects;
+create policy work_photos_object_admin_delete on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'work-photos' and public.is_admin());
 
 
 -- ----------------------------------------------------------------- 授权
