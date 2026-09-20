@@ -33,3 +33,15 @@
 16. ~~storage.objects 上只有 authenticated 管自己文件的策略, 管理员没有任何策略, 要撤下一张违规截图只能进控制台或者拿 service key, 补一条 is_admin() 的 delete 策略~~
 
 17. ~~(storage.foldername(name))[1] 只校验第一段目录, 后面的路径和文件名完全自由, 第 1 条把键换成 author_id/photo_id 之后这个洞不会自动消失, 策略要跟着收成完整两段的形状, 收紧之后第 15 条的乱传也一并挡掉~~
+
+18. 截止时间还是建表那一刻算出来的 +30 天 / +45 天, 上线前 update contest_settings 改成真实日期, 时间戳必须带 +08, 不带会按数据库的 UTC 算差 8 小时
+
+19. 管理员和评委只能在 SQL Editor 里 update profiles.role 指派, 站内没有任何入口, 而且对方必须先自己注册过一次才有 profiles 行
+
+20. 部署到社团服务器: pnpm build 产出的 .output/ 是自包含的, 连 node_modules 都不用带, 拷 .output/ 和 .env 两样就够, 起进程是 PORT=3000 HOST=0.0.0.0 node .output/server/index.mjs, 配个 systemd unit 守着
+
+21. cloudflared 隧道指向 http://localhost:3000, 内网走 http://<服务器IP>:3000, 两条路同一个进程
+
+22. 挂上社团域名之后要去 Supabase 的 Auth → URL Configuration 改 Site URL, 并把 https://<社团域名>/confirm 加进 Redirect URLs; 想让内网 IP 那条也能登录就把 http://<服务器IP>:3000/confirm 一起加上, 不加的话 GitHub 登录和邮箱链接回跳会被拒
+
+23. 手机端只保证了不横向溢出, 断点和折行都写了, 但没在真机上量过间距和点击区域, 上线前找台手机过一遍
