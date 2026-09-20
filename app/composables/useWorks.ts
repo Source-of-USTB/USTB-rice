@@ -20,7 +20,7 @@ function failed(error: { message: string } | null, fallback: string): ActionResu
  */
 export function useWorks() {
   const supabase = useSupabaseClient<Database>()
-  const account = useSupabaseUser()
+  const { accountId } = useAuth()
   const { snapshot, loading, refresh } = useContestData()
 
   const settings = computed(() => snapshot.value.settings)
@@ -66,7 +66,7 @@ export function useWorks() {
     entries.value.find(entry => entry.work.id === workId) ?? null
 
   const myEntry = computed(() => {
-    const id = account.value?.id
+    const id = accountId.value
     return id ? entryByAuthor(id) : null
   })
 
@@ -93,7 +93,7 @@ export function useWorks() {
 
   /** 第一次保存文本或上传照片时懒建作品行 */
   async function ensureMyWork(): Promise<{ id: string } | { error: ActionResult }> {
-    const uid = account.value?.id
+    const uid = accountId.value
     if (!uid) {
       return { error: { ok: false, message: '请先登录' } }
     }
@@ -118,7 +118,7 @@ export function useWorks() {
 
   /** 新增或修改自己的作品说明 (每人只有一份) */
   async function saveMyText(payload: { title: string, description: string, tags: string[] }): Promise<ActionResult> {
-    const uid = account.value?.id
+    const uid = accountId.value
     if (!uid) {
       return { ok: false, message: '请先登录' }
     }
@@ -185,7 +185,7 @@ export function useWorks() {
    * 这也是张数上限能同时管住存储侧的原因: 记录被 enforce_photo_limit 卡死了.
    */
   async function addMyPhotos(files: File[]): Promise<ActionResult> {
-    const uid = account.value?.id
+    const uid = accountId.value
     if (!uid) {
       return { ok: false, message: '请先登录' }
     }
@@ -297,7 +297,7 @@ export function useWorks() {
 
   /** 用户互投: 再点一次取消 */
   async function toggleUserVote(workId: string): Promise<ActionResult> {
-    const uid = account.value?.id
+    const uid = accountId.value
     if (!uid) {
       return { ok: false, message: '请先登录后再投票' }
     }
@@ -345,7 +345,7 @@ export function useWorks() {
    * 两步之间不是一个事务: 撤成功而投失败时这份作品会暂时没有分, 重新打一次即可.
    */
   async function setJudgeScore(workId: string, score: number): Promise<ActionResult> {
-    const uid = account.value?.id
+    const uid = accountId.value
     if (!uid) {
       return { ok: false, message: '请先登录' }
     }

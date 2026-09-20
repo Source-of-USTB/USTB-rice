@@ -11,8 +11,20 @@ export function useAuth() {
   const account = useSupabaseUser()
   const { snapshot, refresh } = useContestData()
 
+  /**
+   * 当前账号的 uuid.
+   *
+   * @nuxtjs/supabase v2 的 useSupabaseUser() 返回的是解码后的 JWT claims, 不是 auth.users
+   * 那一行 —— 用户 id 在标准字段 sub 里, 对象上压根没有 id. v1 返回的才是 User, 字段叫 id.
+   * 两个都认一下, 省得哪天模块又换回去.
+   */
+  const accountId = computed(() => {
+    const claims = account.value as { id?: string, sub?: string } | null
+    return claims?.id ?? claims?.sub ?? null
+  })
+
   const user = computed<Profile | null>(() => {
-    const id = account.value?.id
+    const id = accountId.value
     if (!id) {
       return null
     }
@@ -25,7 +37,8 @@ export function useAuth() {
     }
   })
 
-  const isLoggedIn = computed(() => Boolean(account.value))
+  // 用 accountId 而不是 account: 拿不到 id 的"登录"对下游没有任何意义, 只会漏成更怪的状态
+  const isLoggedIn = computed(() => Boolean(accountId.value))
   const isJudge = computed(() => user.value?.role === 'judge' || user.value?.role === 'admin')
 
   /**
@@ -36,7 +49,7 @@ export function useAuth() {
    * 长度和"不能自己提权"在数据库里都再挡了一遍, 这里只是少发一次注定失败的请求.
    */
   async function saveMyName(name: string): Promise<ActionResult> {
-    const id = account.value?.id
+    const id = accountId.value
     if (!id) {
       return { ok: false, message: '请先登录' }
     }
@@ -66,5 +79,5 @@ export function useAuth() {
     await navigateTo('/')
   }
 
-  return { account, user, isLoggedIn, isJudge, saveMyName, signOut }
+  return { account, accountId, user, isLoggedIn, isJudge, saveMyName, signOut }
 }

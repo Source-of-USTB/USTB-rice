@@ -16,7 +16,10 @@ function isActive(to: string) {
 const userMenu = computed(() => [
   [
     { label: '我的作品', icon: 'i-lucide-panels-top-left', to: '/me' },
-    { label: '我的主页', icon: 'i-lucide-user', to: `/u/${user.value?.id ?? ''}` }
+    // 拿不到 id 就整条不给: 拼成 /u/ 的话 /u/[id] 匹配不上, 路由会报一条 404 警告
+    ...(user.value?.id
+      ? [{ label: '我的主页', icon: 'i-lucide-user', to: `/u/${user.value.id}` }]
+      : [])
   ],
   [
     { label: '退出登录', icon: 'i-lucide-log-out', color: 'error' as const, onSelect: () => signOut() }
