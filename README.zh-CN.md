@@ -43,6 +43,7 @@ update public.profiles set role = 'judge' where id = '<对方的 uuid>';
 
 ```txt
 supabase/schema.sql            建表、RLS 策略、触发器、存储桶
+supabase/reset.sql             清空 schema.sql 建的所有东西
 app/pages/                     页面路由
 app/components/                公共组件
 app/composables/               取数与写操作

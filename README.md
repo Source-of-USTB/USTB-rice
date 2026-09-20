@@ -43,6 +43,7 @@ update public.profiles set role = 'judge' where id = '<their uuid>';
 
 ```txt
 supabase/schema.sql            tables, RLS policies, triggers, storage bucket
+supabase/reset.sql             drops everything schema.sql creates
 app/pages/                     page routes
 app/components/                shared components
 app/composables/               data fetching and mutations

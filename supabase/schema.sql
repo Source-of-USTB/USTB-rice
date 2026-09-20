@@ -16,9 +16,12 @@
 
 -- ---------------------------------------------------------------- 枚举
 do $$ begin
-  create type public.contest_phase as enum ('upload', 'voting');
+  create type public.contest_phase as enum ('upload', 'voting', 'ended');
 exception when duplicate_object then null; end $$;
 
+-- 下面这句是给"类型已经建过、但只有前两个值"的库补 'ended'.
+-- 全新的库走上面的 create type 就齐了, 根本不会走到这里.
+--
 -- 'ended' 是后补的第三个阶段. 没有它, 投票截止之后 current_phase 只能继续答 'voting',
 -- 而 voting_open 已经关了, 两个函数对同一个时刻给出矛盾的答案.
 --
@@ -154,6 +157,20 @@ language sql stable security definer set search_path = public as $$
   select public.current_phase() = 'voting'
 $$;
 
+-- 从注册信息里挑一个像样的昵称出来. 注册触发器和下面的补写都用它,
+-- 免得同一套取值顺序在两个地方各写一遍还写不一样.
+create or replace function public.default_display_name(meta jsonb, email text)
+returns text
+language sql immutable set search_path = public as $$
+  select left(btrim(coalesce(
+    nullif(btrim(meta ->> 'name'), ''),
+    nullif(btrim(meta ->> 'user_name'), ''),
+    nullif(btrim(meta ->> 'full_name'), ''),
+    nullif(btrim(split_part(coalesce(email, 'user'), '@', 1)), ''),
+    'user'
+  )), 24)
+$$;
+
 create or replace function public.my_role()
 returns public.user_role
 language sql stable security definer set search_path = public as $$
@@ -214,15 +231,7 @@ create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
   insert into public.profiles (id, name)
-  values (
-    new.id,
-    left(coalesce(
-      nullif(new.raw_user_meta_data ->> 'name', ''),
-      nullif(new.raw_user_meta_data ->> 'user_name', ''),
-      nullif(new.raw_user_meta_data ->> 'full_name', ''),
-      split_part(coalesce(new.email, 'user'), '@', 1)
-    ), 24)
-  )
+  values (new.id, public.default_display_name(new.raw_user_meta_data, new.email))
   on conflict (id) do nothing;
   return new;
 end $$;
@@ -231,6 +240,14 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
+
+-- 给已经注册过的账号补一条 profiles. 上面那个触发器只在注册那一刻跑一次,
+-- 所以清库重建之后老账号会没有这一行, 而 works.author_id 的外键指着 profiles ——
+-- 不补的话他们一提交作品就撞外键.
+insert into public.profiles (id, name)
+select u.id, public.default_display_name(u.raw_user_meta_data, u.email)
+from auth.users u
+on conflict (id) do nothing;
 
 -- 谁都不能把自己提成评委/管理员
 create or replace function public.guard_profile_role()
