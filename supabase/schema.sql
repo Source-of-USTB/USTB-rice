@@ -41,12 +41,19 @@ create table if not exists public.contest_settings (
   max_description  smallint      not null default 800,
   user_vote_limit  smallint      not null default 3,
   judge_max_score  smallint      not null default 10,
-  -- TODO: 9
   popular_weight   numeric(3, 2) not null default 0.40,
   judge_weight     numeric(3, 2) not null default 0.60,
-  -- TODO: 6
   updated_at       timestamptz   not null default now()
 );
+
+-- 两个权重加起来必须正好是 1, 否则综合分的满分就不是 100.
+-- 放在 alter 里而不是上面的 create table 里: 表已经建过的话 create table if not exists
+-- 会整段跳过, 约束加不上去.
+do $$ begin
+  alter table public.contest_settings
+    add constraint contest_settings_weight_sum
+    check (popular_weight >= 0 and judge_weight >= 0 and popular_weight + judge_weight = 1);
+exception when duplicate_object then null; end $$;
 
 insert into public.contest_settings (id) values (1) on conflict (id) do nothing;
 
@@ -189,6 +196,19 @@ where s.id = 1;
 
 
 -- -------------------------------------------------------------- 触发器
+-- 设置的改动时间. 不用 security definer: 只改 new, 不读别的表.
+create or replace function public.touch_contest_settings()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  new.updated_at := now();
+  return new;
+end $$;
+
+drop trigger if exists contest_settings_touch on public.contest_settings;
+create trigger contest_settings_touch
+  before update on public.contest_settings
+  for each row execute function public.touch_contest_settings();
+
 -- 注册后自动建一条 profiles
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
@@ -228,7 +248,6 @@ create trigger profiles_guard_role
   for each row execute function public.guard_profile_role();
 
 -- 作品: 维护 updated_at, 并限制说明字数
--- continue
 create or replace function public.enforce_work_rules()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
@@ -292,6 +311,7 @@ begin
   select author_id into author from public.works where id = new.work_id;
 
   if new.kind = 'user' then
+  -- 移动到最外侧, 不能给自己投票.
     if author = new.voter_id then
       raise exception '不能给自己的作品投票' using errcode = 'check_violation';
     end if;
@@ -336,9 +356,10 @@ drop policy if exists contest_settings_read on public.contest_settings;
 create policy contest_settings_read on public.contest_settings
   for select to anon, authenticated using (true);
 
+-- UPDATE 策略省略 with check 时 Postgres 会拿 using 当检查条件, 不用重复写一遍
 drop policy if exists contest_settings_admin_write on public.contest_settings;
 create policy contest_settings_admin_write on public.contest_settings
-  for update to authenticated using (public.is_admin()) with check (public.is_admin());
+  for update to authenticated using (public.is_admin());
 
 -- profiles: 所有人可读, 只能建/改自己的 (role 由触发器守住)
 drop policy if exists profiles_read on public.profiles;
@@ -381,6 +402,7 @@ create policy work_photos_read on public.work_photos
   for select to anon, authenticated using (true);
 
 -- TODO: 1
+-- continue
 drop policy if exists work_photos_insert_own on public.work_photos;
 create policy work_photos_insert_own on public.work_photos
   for insert to authenticated
@@ -441,6 +463,7 @@ create policy votes_delete_own_user on public.votes
 
 -- --------------------------------------------------------------- 存储桶
 -- 截图放在 work-photos 桶里, 每个人只能写自己 uid 命名的文件夹
+-- TODO: 14
 insert into storage.buckets (id, name, public)
 values ('work-photos', 'work-photos', true)
 on conflict (id) do nothing;
@@ -449,15 +472,18 @@ drop policy if exists work_photos_object_read on storage.objects;
 create policy work_photos_object_read on storage.objects
   for select to anon, authenticated using (bucket_id = 'work-photos');
 
+-- TODO: 15
 drop policy if exists work_photos_object_insert on storage.objects;
 create policy work_photos_object_insert on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'work-photos'
+    -- TODO: 17
     and (storage.foldername(name))[1] = (select auth.uid())::text
     and public.current_phase() = 'upload'
   );
 
+-- TODO: 16
 drop policy if exists work_photos_object_delete on storage.objects;
 create policy work_photos_object_delete on storage.objects
   for delete to authenticated

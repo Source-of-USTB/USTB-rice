@@ -10,19 +10,19 @@
 
 5. 阶段现在按截止时间算加 phase_override 兜底, 另一条路是保留 phase 列加 pg_cron 定时翻, 待定
 
-6. contest_settings.updated_at 没有触发器维护永远停在创建时间, 加触发器或者删掉这一列
+6. ~~contest_settings.updated_at 没有触发器维护永远停在创建时间, 加触发器或者删掉这一列~~
 
 7. voting_open() 没调 current_phase() 而是把阶段逻辑重推了一遍, 两者会给出矛盾答案(过了投票截止 phase 还是 voting 但投不了), 根源是枚举缺「已结束」状态, 加第三个阶段让 current_phase 独自说了算
 
 8. 视图 phase 单纯封装了 current_phase 和 contest_settings, 无效封装, 改成直接调用 current_phase() 和查询 contest_settings
 
-9. popular_weight 和 judge_weight 之和不受约束, 能存成 0.4 和 0.7 让综合分满分变成 110, 加 check 约束
+9. ~~popular_weight 和 judge_weight 之和不受约束, 能存成 0.4 和 0.7 让综合分满分变成 110, 加 check 约束~~
 
 10. 自投检查只写在 enforce_vote_rules 的 user 分支里, 评委能给自己的作品打分, 把 author = new.voter_id 那段移到 kind 判断外面对两种票都生效
 
 11. enforce_vote_rules 不查重复投票全靠表上的 unique 约束兜底, 票满时重复投同一份会先撞预算检查报出误导的「每人最多投 N 份」, 而且抛的是裸的 23505 英文约束名, 在预算检查之前先查一次这个 voter 对该 work 投过没有
 
-12. contest_settings_admin_write 的 with check (is_admin()) 是冗余样板, 表达式不引用新行任何列所以和 using 求值必然相同, 而且 UPDATE 策略省略 with check 时 Postgres 本来就会拿 using 当检查条件, 删掉零影响
+12. ~~contest_settings_admin_write 的 with check (is_admin()) 是冗余样板, 表达式不引用新行任何列所以和 using 求值必然相同, 而且 UPDATE 策略省略 with check 时 Postgres 本来就会拿 using 当检查条件, 删掉零影响~~
 
 13. 票只应该有增和删两种操作, 不存在改, 要换目标就先删再增; 删掉 votes_update_own_judge 策略, 给 kind = judge 补一条同样受 voting_open 约束的删除策略, enforce_vote_rules 的触发时机从 before insert or update 收成 before insert(预算计数里那个 id <> new.id 也可以去掉), 前端 setJudgeScore 的 upsert 改成先 delete 再 insert; 同时 votes 的策略应该只管归属不管规则(现有 insert 策略已经是这个形状), delete 策略里的 kind = user 和 voting_open 都拿掉只留 voter_id = auth.uid(), 规则统一交给触发器按 kind 判; 但必须配套补一个 before delete 触发器, 否则 voting_open 从策略里拿掉之后没人管删除的时间窗口, 投票结束了还能回去撤票 —— 注意 delete 触发器里 new 是 null 要用 old, 得单独写一个函数不能复用 enforce_vote_rules; 顺带白赚一条: 撤票失败时能抛出「投票已经结束」, 而不是现在这样 delete 静默影响 0 行、前端还以为成功了; 评委靠 update work_id 把分数搬到别的作品从而变相撤分那个洞会随之消失
 
