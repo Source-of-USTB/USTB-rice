@@ -177,7 +177,13 @@ export function useWorks() {
 
   /* ------------------------------ 我的照片 ------------------------------ */
 
-  /** 上传照片: 先传 Storage, 再写 work_photos */
+  /**
+   * 上传照片: 先写 work_photos, 再传 Storage.
+   *
+   * 顺序不能反. 存储键是 work_id/photo_id, 而 storage.objects 的插入策略会回头去
+   * work_photos 里核对这条记录确实存在且属于你 —— 记录还没插, 文件就传不上去.
+   * 这也是张数上限能同时管住存储侧的原因: 记录被 enforce_photo_limit 卡死了.
+   */
   async function addMyPhotos(files: File[]): Promise<ActionResult> {
     const uid = account.value?.id
     if (!uid) {
@@ -207,26 +213,26 @@ export function useWorks() {
     const bucket = supabase.storage.from(PHOTO_BUCKET)
 
     for (const [index, file] of accepted.entries()) {
-      const extension = file.name.split('.').pop()?.toLowerCase() || 'png'
-      const path = `${uid}/${crypto.randomUUID()}.${extension}`
-
-      const upload = await bucket.upload(path, file, { contentType: file.type })
-      if (upload.error) {
-        await refresh()
-        return failed(upload.error, '图片上传失败')
-      }
+      const photoId = crypto.randomUUID()
 
       const { error } = await supabase.from('work_photos').insert({
+        id: photoId,
         work_id: work.id,
-        storage_path: path,
         sort_order: existing.length + index
       })
 
       if (error) {
-        // 写表失败就把刚传上去的文件删掉, 别留孤儿文件
-        await bucket.remove([path])
         await refresh()
         return failed(error, '保存图片记录失败')
+      }
+
+      const upload = await bucket.upload(photoPath(work.id, photoId), file, { contentType: file.type })
+
+      if (upload.error) {
+        // 文件没传上去就把刚插的记录撤掉, 否则页面上会挂一张碎图
+        await supabase.from('work_photos').delete().eq('id', photoId)
+        await refresh()
+        return failed(upload.error, '图片上传失败')
       }
     }
 
@@ -247,12 +253,12 @@ export function useWorks() {
       return { ok: false, message: '照片不存在' }
     }
 
+    // Storage 里的文件由 work_photos 上的 after delete 触发器顺手带走, 这里不用再删一次
     const { error } = await supabase.from('work_photos').delete().eq('id', photoId)
     if (error) {
       return failed(error, '删除失败')
     }
 
-    await supabase.storage.from(PHOTO_BUCKET).remove([target.storagePath])
     await refresh()
     return { ok: true, message: '照片已删除' }
   }

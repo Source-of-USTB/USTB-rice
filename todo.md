@@ -1,10 +1,10 @@
 # TODO
 
-1. work_photos.storage_path 是裸 text 且插入策略不看路径, 用户能只插记录不传文件把别人的图挂成自己的作品, 而且 getPublicUrl 只做 encodeURI 不转义 .. 和 /, HTTP 层的路径穿越现在就成立, 将来任何把它当真实路径用的消费者(清理脚本、备份、图片管线)还会变成命令注入面; 删掉这一列, 存储键改成由 works.author_id 和 work_photos.id 两个 uuid 列拼出来, 让类型系统直接挡住畸形值, 不需要正则也不需要触发器; 已知代价是键里不再有扩展名 —— 显示不受影响(Content-Type 来自上传时写入的对象元数据, 浏览器认的是响应头不是 URL 后缀), Supabase 的 render/image 变换端点同样按对象走, 唯一影响是右键另存为会得到裸 uuid 文件名(需要时用 getPublicUrl 的 download 选项指定), 以及按后缀做规则的 CDN 缓存策略用不上(本项目没有)
+1. ~~work_photos.storage_path 是裸 text 且插入策略不看路径, 用户能只插记录不传文件把别人的图挂成自己的作品, 而且 getPublicUrl 只做 encodeURI 不转义 .. 和 /, HTTP 层的路径穿越现在就成立, 将来任何把它当真实路径用的消费者(清理脚本、备份、图片管线)还会变成命令注入面; 删掉这一列, 存储键改成由 works.author_id 和 work_photos.id 两个 uuid 列拼出来, 让类型系统直接挡住畸形值, 不需要正则也不需要触发器; 已知代价是键里不再有扩展名 —— 显示不受影响(Content-Type 来自上传时写入的对象元数据, 浏览器认的是响应头不是 URL 后缀), Supabase 的 render/image 变换端点同样按对象走, 唯一影响是右键另存为会得到裸 uuid 文件名(需要时用 getPublicUrl 的 download 选项指定), 以及按后缀做规则的 CDN 缓存策略用不上(本项目没有)~~
 
-2. 外键级联只删数据库记录, Storage 里的图片文件留成孤儿且仍可公开访问, 加 after delete 触发器清 storage.objects
+2. ~~外键级联只删数据库记录, Storage 里的图片文件留成孤儿且仍可公开访问, 加 after delete 触发器清 storage.objects~~
 
-3. addMyPhotos 用文件名取扩展名会生成畸形路径, 第 1 条改成 uuid 拼键之后键里不再有扩展名(Content-Type 走对象元数据, 显示不依赖后缀), 这条随之消失
+3. ~~addMyPhotos 用文件名取扩展名会生成畸形路径, 第 1 条改成 uuid 拼键之后键里不再有扩展名(Content-Type 走对象元数据, 显示不依赖后缀), 这条随之消失~~
 
 4. ~~昵称注册时定死, profiles 前端没有写入路径, 在 /me 加一个输入框~~
 
@@ -28,8 +28,8 @@
 
 14. ~~建桶语句没设 file_size_limit 和 allowed_mime_types, 任何登录用户能往公开桶里塞任意大小任意类型的文件, 传个带脚本的 SVG 上去就是以 Supabase 项目域名的身份执行(那个域名同时还挂着 auth 接口), 补上体积上限和 image/png,image/jpeg,image/webp 白名单; 注意现有的 on conflict (id) do nothing 会让这个改动对已经建好的桶完全不生效, 得改成 on conflict (id) do update set~~
 
-15. 上传张数只有 enforce_photo_limit 数 work_photos 的行, 存储侧一张不管, 用户可以传一百个文件只插 max_photos 条记录, 多出来的就是没人引用又能公开下载的孤儿, 和第 2 条机制不同(那条是删记录留文件, 这条是压根没插过记录), 前端上传后插记录失败要回删, 另外需要一个对账清理
+15. ~~上传张数只有 enforce_photo_limit 数 work_photos 的行, 存储侧一张不管, 用户可以传一百个文件只插 max_photos 条记录, 多出来的就是没人引用又能公开下载的孤儿, 和第 2 条机制不同(那条是删记录留文件, 这条是压根没插过记录), 前端上传后插记录失败要回删, 另外需要一个对账清理~~
 
 16. ~~storage.objects 上只有 authenticated 管自己文件的策略, 管理员没有任何策略, 要撤下一张违规截图只能进控制台或者拿 service key, 补一条 is_admin() 的 delete 策略~~
 
-17. (storage.foldername(name))[1] 只校验第一段目录, 后面的路径和文件名完全自由, 第 1 条把键换成 author_id/photo_id 之后这个洞不会自动消失, 策略要跟着收成完整两段的形状, 收紧之后第 15 条的乱传也一并挡掉
+17. ~~(storage.foldername(name))[1] 只校验第一段目录, 后面的路径和文件名完全自由, 第 1 条把键换成 author_id/photo_id 之后这个洞不会自动消失, 策略要跟着收成完整两段的形状, 收紧之后第 15 条的乱传也一并挡掉~~

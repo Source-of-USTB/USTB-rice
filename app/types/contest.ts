@@ -39,11 +39,10 @@ export interface Profile {
   role: UserRole
 }
 
-/** work_photos 表, url 是从 Storage 拼出来的公开地址 */
+/** work_photos 表, url 由 photoPath() 拼出来的键换成公开地址 */
 export interface WorkPhoto {
   id: string
   workId: string
-  storagePath: string
   url: string
   sortOrder: number
 }

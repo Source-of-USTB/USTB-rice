@@ -34,7 +34,6 @@ interface WorkRow {
 interface PhotoRow {
   id: string
   work_id: string
-  storage_path: string
   sort_order: number
 }
 
@@ -106,7 +105,7 @@ export function useContestData() {
       supabase.from('contest_settings').select('*').maybeSingle(),
       supabase.from('profiles').select('id, name, role'),
       supabase.from('works').select('id, author_id, title, description, tags, created_at, updated_at'),
-      supabase.from('work_photos').select('id, work_id, storage_path, sort_order').order('sort_order'),
+      supabase.from('work_photos').select('id, work_id, sort_order').order('sort_order'),
       supabase.from('work_scores').select('work_id, user_votes, judge_score, judge_count'),
       user.value
         ? supabase.from('votes').select('work_id, kind, score')
@@ -157,8 +156,7 @@ export function useContestData() {
       photos: ((photosRes.data ?? []) as PhotoRow[]).map(row => ({
         id: row.id,
         workId: row.work_id,
-        storagePath: row.storage_path,
-        url: bucket.getPublicUrl(row.storage_path).data.publicUrl,
+        url: bucket.getPublicUrl(photoPath(row.work_id, row.id)).data.publicUrl,
         sortOrder: row.sort_order
       })),
       scores: ((scoresRes.data ?? []) as ScoreRow[]).map(row => ({

@@ -41,7 +41,6 @@ type WorkRow = {
 type PhotoRow = {
   id: string
   work_id: string
-  storage_path: string
   sort_order: number
   created_at: string
 }
@@ -85,7 +84,7 @@ export interface Database {
       }
       work_photos: {
         Row: PhotoRow
-        Insert: Pick<PhotoRow, 'work_id' | 'storage_path'> & Partial<PhotoRow>
+        Insert: Pick<PhotoRow, 'work_id'> & Partial<PhotoRow>
         Update: Partial<PhotoRow>
         Relationships: []
       }

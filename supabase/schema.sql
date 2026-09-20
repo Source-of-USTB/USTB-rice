@@ -84,17 +84,20 @@ create table if not exists public.works (
   updated_at  timestamptz not null default now()
 );
 
--- 截图: 一份作品可以有多张
+-- 截图: 一份作品可以有多张.
+--
+-- 表里不存路径. 文件在 Storage 里的键固定是 work_id/id 两个 uuid 拼起来的,
+-- 谁都构造不出畸形值, 也就不需要正则、触发器或者任何"记得转义"的约定.
+-- 前端拼这个键的地方在 app/utils/contest-config.ts 的 photoPath().
 create table if not exists public.work_photos (
-  id           uuid primary key default gen_random_uuid(),
-  -- TODO: 2
-  work_id      uuid not null references public.works (id) on delete cascade,
-  -- 危险字段, 没防御.
-  -- TODO: 1
-  storage_path text not null,
-  sort_order   smallint not null default 0,
-  created_at   timestamptz not null default now()
+  id         uuid primary key default gen_random_uuid(),
+  work_id    uuid not null references public.works (id) on delete cascade,
+  sort_order smallint not null default 0,
+  created_at timestamptz not null default now()
 );
+
+-- 旧版本有一列 storage_path, 存的是前端拼出来的裸字符串. 去掉.
+alter table public.work_photos drop column if exists storage_path;
 
 create index if not exists work_photos_work_idx on public.work_photos (work_id, sort_order);
 
@@ -291,6 +294,27 @@ create trigger work_photos_enforce_limit
   before insert on public.work_photos
   for each row execute function public.enforce_photo_limit();
 
+-- 删记录的同时把 Storage 里的文件删掉. 不删的话文件成了没人引用的孤儿,
+-- 而桶是公开的, 谁手上有旧链接就还能一直下载.
+--
+-- 键只用 old 这一行自己的两列拼, 不去查父表: 级联删除 (删作品、删账号) 触发到这里时,
+-- 父行已经没了, 查回来是空的, 而级联恰恰是最需要清理的那个场景.
+-- security definer 是为了绕开 storage.objects 上的 RLS.
+create or replace function public.delete_photo_object()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  delete from storage.objects
+  where bucket_id = 'work-photos'
+    and name = old.work_id::text || '/' || old.id::text;
+
+  return old;
+end $$;
+
+drop trigger if exists work_photos_delete_object on public.work_photos;
+create trigger work_photos_delete_object
+  after delete on public.work_photos
+  for each row execute function public.delete_photo_object();
+
 -- 投票规则: 阶段、不能投自己、重复投票、票数上限、评委身份、分数范围.
 -- 只挂在 insert 上: 票没有"改"这个操作, 换目标或者改分都是先撤再投.
 create or replace function public.enforce_vote_rules()
@@ -428,8 +452,6 @@ drop policy if exists work_photos_read on public.work_photos;
 create policy work_photos_read on public.work_photos
   for select to anon, authenticated using (true);
 
--- TODO: 1
--- continue
 drop policy if exists work_photos_insert_own on public.work_photos;
 create policy work_photos_insert_own on public.work_photos
   for insert to authenticated
@@ -514,25 +536,30 @@ drop policy if exists work_photos_object_read on storage.objects;
 create policy work_photos_object_read on storage.objects
   for select to anon, authenticated using (bucket_id = 'work-photos');
 
--- TODO: 15
+-- 键必须正好等于"自己名下某条 work_photos 记录"拼出来的那一个字符串.
+-- 这一条同时管住了三件事: 目录层级的形状、文件名是不是合法的记录 id、以及张数 ——
+-- 记录数已经被 enforce_photo_limit 卡在 max_photos, 没有记录就传不上来,
+-- 所以没法再往桶里塞一堆没人引用的文件.
+-- 也因此前端必须先插记录再传文件, 顺序反了会被这条策略直接拒掉.
 drop policy if exists work_photos_object_insert on storage.objects;
 create policy work_photos_object_insert on storage.objects
   for insert to authenticated
   with check (
     bucket_id = 'work-photos'
-    -- TODO: 17
-    and (storage.foldername(name))[1] = (select auth.uid())::text
     and public.current_phase() = 'upload'
+    and exists (
+      select 1
+      from public.work_photos p
+      join public.works w on w.id = p.work_id
+      where w.author_id = (select auth.uid())
+        and name = w.id::text || '/' || p.id::text
+    )
   );
 
+-- 普通用户不再直接删对象: 文件的生命周期跟着记录走, 删记录由上面那个
+-- after delete 触发器顺手把文件带走. 留着这条策略只会多出"文件删了记录还在"
+-- 这一种页面挂碎图的姿势. 这一句是为了把旧版本建过的策略清掉.
 drop policy if exists work_photos_object_delete on storage.objects;
-create policy work_photos_object_delete on storage.objects
-  for delete to authenticated
-  using (
-    bucket_id = 'work-photos'
-    and (storage.foldername(name))[1] = (select auth.uid())::text
-    and public.current_phase() = 'upload'
-  );
 
 -- 管理员撤下违规截图. 不看阶段: 投票期间发现问题也得能删.
 -- 同一条命令上的多条 permissive 策略是 or 关系, 这条只是在上面那条之外多开一个口子.
