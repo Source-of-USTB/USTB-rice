@@ -249,11 +249,17 @@ select u.id, public.default_display_name(u.raw_user_meta_data, u.email)
 from auth.users u
 on conflict (id) do nothing;
 
--- 谁都不能把自己提成评委/管理员
+-- 谁都不能把自己提成评委/管理员.
+--
+-- auth.uid() 为空说明这根本不是一次 API 请求 (SQL Editor、service key、控制台),
+-- 那已经是数据库层面的权限了, 不用再拦 —— 不放行的话第一个管理员就造不出来:
+-- 指派管理员只能在 SQL Editor 里做, 而那里 is_admin() 永远是 false.
 create or replace function public.guard_profile_role()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  if new.role is distinct from old.role and not public.is_admin() then
+  if auth.uid() is not null
+     and new.role is distinct from old.role
+     and not public.is_admin() then
     new.role := old.role;
   end if;
   return new;
