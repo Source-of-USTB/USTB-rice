@@ -294,7 +294,8 @@ create trigger work_photos_enforce_limit
   before insert on public.work_photos
   for each row execute function public.enforce_photo_limit();
 
--- 投票规则: 阶段、不能投自己、票数上限、评委身份、分数范围
+-- 投票规则: 阶段、不能投自己、重复投票、票数上限、评委身份、分数范围.
+-- 只挂在 insert 上: 票没有"改"这个操作, 换目标或者改分都是先撤再投.
 create or replace function public.enforce_vote_rules()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
@@ -310,15 +311,24 @@ begin
 
   select author_id into author from public.works where id = new.work_id;
 
-  if new.kind = 'user' then
-  -- 移动到最外侧, 不能给自己投票.
-    if author = new.voter_id then
-      raise exception '不能给自己的作品投票' using errcode = 'check_violation';
-    end if;
+  -- 两种票一起拦: 评委也不能给自己的作品打分
+  if author = new.voter_id then
+    raise exception '不能给自己的作品投票或打分' using errcode = 'check_violation';
+  end if;
 
+  -- 排在票数上限之前. 否则票投满之后重复投同一份会先撞上限, 报出误导的
+  -- "每人最多投 N 份"; 而真落到表上的 unique 约束, 抛的是一句裸的英文约束名.
+  if exists (
+    select 1 from public.votes
+    where work_id = new.work_id and voter_id = new.voter_id and kind = new.kind
+  ) then
+    raise exception '已经投过这份作品了, 要改先撤销' using errcode = 'unique_violation';
+  end if;
+
+  if new.kind = 'user' then
     select count(*) into used
     from public.votes
-    where voter_id = new.voter_id and kind = 'user' and id <> new.id;
+    where voter_id = new.voter_id and kind = 'user';
 
     if used >= settings.user_vote_limit then
       raise exception '每人最多投 % 份作品', settings.user_vote_limit using errcode = 'check_violation';
@@ -340,8 +350,28 @@ end $$;
 
 drop trigger if exists votes_enforce_rules on public.votes;
 create trigger votes_enforce_rules
-  before insert or update on public.votes
+  before insert on public.votes
   for each row execute function public.enforce_vote_rules();
+
+-- 撤票. 时间窗口放在触发器而不是策略里: 策略拦下来的 delete 只是影响 0 行,
+-- 前端看不出区别还以为撤成功了; 放这里能给出一句人话.
+-- delete 触发器里 new 是 null 只能读 old, 所以复用不了上面那个函数.
+create or replace function public.enforce_vote_delete_rules()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  -- 只拦本人撤票. auth.uid() 为空 (service key、控制台) 或者对不上 (删作品/删账号时
+  -- 级联带走的别人的票) 都放行, 否则比赛结束之后连删个账号都会被这里挡下来.
+  if old.voter_id = (select auth.uid()) and not public.voting_open() then
+    raise exception '投票已经结束, 不能再撤销' using errcode = 'check_violation';
+  end if;
+
+  return old;
+end $$;
+
+drop trigger if exists votes_enforce_delete_rules on public.votes;
+create trigger votes_enforce_delete_rules
+  before delete on public.votes
+  for each row execute function public.enforce_vote_delete_rules();
 
 
 -- ------------------------------------------------------------- RLS 策略
@@ -446,24 +476,20 @@ drop policy if exists votes_read_own on public.votes;
 create policy votes_read_own on public.votes
   for select to authenticated using (voter_id = (select auth.uid()));
 
+-- 投和撤两条策略都只管这票是不是本人的. 规则 (阶段、评委身份、票数上限、不能投自己)
+-- 统一交给触发器按 kind 判, 免得同一条规则在两个地方各写一遍还写不一样.
 drop policy if exists votes_insert_own on public.votes;
 create policy votes_insert_own on public.votes
   for insert to authenticated with check (voter_id = (select auth.uid()));
 
+-- 没有 update 策略: 票只有投和撤, 评委改分走先撤再投.
+-- 这一句是为了把旧版本留下的 votes_update_own_judge 清掉.
 drop policy if exists votes_update_own_judge on public.votes;
-create policy votes_update_own_judge on public.votes
-  for update to authenticated
-  using (voter_id = (select auth.uid()) and kind = 'judge')
-  with check (voter_id = (select auth.uid()) and kind = 'judge');
 
 drop policy if exists votes_delete_own_user on public.votes;
-create policy votes_delete_own_user on public.votes
-  for delete to authenticated
-  using (
-    voter_id = (select auth.uid())
-    and kind = 'user'
-    and public.voting_open()
-  );
+drop policy if exists votes_delete_own on public.votes;
+create policy votes_delete_own on public.votes
+  for delete to authenticated using (voter_id = (select auth.uid()));
 
 
 -- --------------------------------------------------------------- 存储桶

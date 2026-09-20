@@ -332,7 +332,12 @@ export function useWorks() {
     return { ok: true, message: `投票成功, 还剩 ${remainingVotes.value} 票` }
   }
 
-  /** 评委打分: 同一个评委对同一份作品只保留最新一次 */
+  /**
+   * 评委打分: 同一个评委对同一份作品只保留最新一次.
+   *
+   * 票只有投和撤两种操作, 数据库里没有 update 策略, 所以改分是先撤掉旧的再投一次.
+   * 两步之间不是一个事务: 撤成功而投失败时这份作品会暂时没有分, 重新打一次即可.
+   */
   async function setJudgeScore(workId: string, score: number): Promise<ActionResult> {
     const uid = account.value?.id
     if (!uid) {
@@ -344,14 +349,23 @@ export function useWorks() {
 
     const clamped = Math.min(settings.value.judgeMaxScore, Math.max(1, Math.round(score)))
 
+    const removed = await supabase
+      .from('votes')
+      .delete()
+      .eq('work_id', workId)
+      .eq('voter_id', uid)
+      .eq('kind', 'judge')
+
+    if (removed.error) {
+      return failed(removed.error, '打分失败')
+    }
+
     const { error } = await supabase
       .from('votes')
-      .upsert(
-        { work_id: workId, voter_id: uid, kind: 'judge', score: clamped },
-        { onConflict: 'work_id,voter_id,kind' }
-      )
+      .insert({ work_id: workId, voter_id: uid, kind: 'judge', score: clamped })
 
     if (error) {
+      await refresh()
       return failed(error, '打分失败')
     }
 
