@@ -1,4 +1,4 @@
-import type { Database } from '~/types/database'
+import type { Database } from '~/types/database.types'
 import type { ContestPhase, ContestSettings, Profile, VoteKind, Work, WorkPhoto } from '~/types/contest'
 
 /* ----------------------- 数据库返回的原始行 (snake_case) ----------------------- */

@@ -2,7 +2,7 @@
  * Supabase 表结构类型.
  *
  * 手写的, 和 supabase/schema.sql 保持一致. 之后装了 Supabase CLI 可以用
- *   supabase gen types typescript --project-id <ref> > app/types/database.ts
+ *   supabase gen types typescript --project-id <ref> > app/types/database.types.ts
  * 直接覆盖这个文件.
  */
 import type { ContestPhase, UserRole, VoteKind } from '~/types/contest'

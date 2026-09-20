@@ -47,7 +47,7 @@ app/pages/                     页面路由
 app/components/                公共组件
 app/composables/               取数与写操作
 app/types/contest.ts           领域模型
-app/types/database.ts          表结构类型，与 schema.sql 对应
+app/types/database.types.ts    表结构类型，与 schema.sql 对应
 scripts/setup-env.mjs          .env 缺失时从 .env.example 生成
 ```
 

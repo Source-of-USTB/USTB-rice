@@ -1,4 +1,4 @@
-import type { Database } from '~/types/database'
+import type { Database } from '~/types/database.types'
 import type { ActionResult, Profile, RankBoard, WorkEntry } from '~/types/contest'
 
 const UNKNOWN_AUTHOR: Profile = {

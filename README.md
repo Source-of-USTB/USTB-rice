@@ -47,7 +47,7 @@ app/pages/                     page routes
 app/components/                shared components
 app/composables/               data fetching and mutations
 app/types/contest.ts           domain model
-app/types/database.ts          table types, mirrors schema.sql
+app/types/database.types.ts    table types, mirrors schema.sql
 scripts/setup-env.mjs          creates .env from .env.example when missing
 ```
 
