@@ -7,7 +7,7 @@ useSeoMeta({
 })
 
 const toast = useToast()
-const { user, isLoggedIn } = useAuth()
+const { user, isLoggedIn, saveMyName } = useAuth()
 const { isUpload, isVoting, config } = useContest()
 const { myEntry, saveMyText, deleteMyText, addMyPhotos, removeMyPhoto, setMyCover } = useWorks()
 
@@ -21,6 +21,27 @@ function report(result: ActionResult) {
     icon: result.ok ? 'i-lucide-circle-check' : 'i-lucide-circle-alert'
   })
   return result
+}
+
+/* -------------------------------- 昵称 -------------------------------- */
+
+const nameDraft = ref('')
+const savingName = ref(false)
+
+// profiles 拉回来之前 user.name 只是邮箱前缀顶着的, 拉回来之后要同步到输入框
+watch(user, (profile) => {
+  if (profile && nameDraft.value === '') {
+    nameDraft.value = profile.name
+  }
+}, { immediate: true })
+
+const nameUnchanged = computed(() =>
+  nameDraft.value.trim() === '' || nameDraft.value.trim() === user.value?.name)
+
+async function onSaveName() {
+  savingName.value = true
+  report(await saveMyName(nameDraft.value))
+  savingName.value = false
 }
 
 /* --------------------------- 作品说明 (一份文本) --------------------------- */
@@ -136,6 +157,32 @@ async function onSetCover(photoId: string) {
       </PageHeading>
 
       <div class="flex flex-col gap-8">
+        <!-- 昵称: 作品墙和个人主页上显示的名字, 不随阶段锁定 -->
+        <section class="flex flex-col gap-4">
+          <h2 class="m-0 text-lg font-bold text-highlighted">
+            昵称
+          </h2>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <UInput
+              v-model="nameDraft"
+              :maxlength="24"
+              placeholder="显示在作品墙上的名字"
+              class="w-full max-w-64"
+              @keydown.enter="onSaveName"
+            />
+            <UButton
+              label="保存"
+              color="neutral"
+              variant="outline"
+              size="sm"
+              :loading="savingName"
+              :disabled="nameUnchanged"
+              @click="onSaveName"
+            />
+          </div>
+        </section>
+
         <p
           v-if="!isUpload"
           class="m-0 flex items-start gap-2 text-sm text-muted"
