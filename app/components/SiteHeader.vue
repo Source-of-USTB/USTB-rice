@@ -39,13 +39,10 @@ const userMenu = computed(() => [
         <span class="hidden text-sm text-muted sm:inline">系统美化大赛</span>
       </NuxtLink>
 
-      <div class="flex items-center gap-2.5">
-        <span
-          class="size-2 shrink-0 rounded-full"
-          :class="isEnded ? 'bg-accented' : 'bg-primary'"
-        />
-        <span class="text-base font-bold text-highlighted">{{ phaseLabel }}</span>
-      </div>
+      <span
+        class="border-b-2 pb-1 text-base font-bold text-highlighted"
+        :class="isEnded ? 'border-accented' : 'border-primary'"
+      >{{ phaseLabel }}</span>
 
       <nav class="ms-auto flex items-center gap-4 sm:gap-5">
         <NuxtLink
