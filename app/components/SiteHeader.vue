@@ -1,6 +1,6 @@
 <script setup lang="ts">
 const route = useRoute()
-const { phaseLabel, isVoting } = useContest()
+const { phaseLabel, isEnded } = useContest()
 const { user, isLoggedIn, signOut } = useAuth()
 
 const navLinks = [
@@ -29,7 +29,8 @@ const userMenu = computed(() => [
 
 <template>
   <header class="border-b border-default">
-    <div class="mx-auto flex w-full max-w-shell flex-wrap items-center gap-x-6 gap-y-3 px-6 py-5 sm:px-8">
+    <!-- 窄屏用 flex 让它自然折行, sm 以上换成三栏网格, 阶段才真的居中 -->
+    <div class="mx-auto flex w-full max-w-shell flex-wrap items-center gap-x-6 gap-y-3 px-6 py-5 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:px-8">
       <NuxtLink
         to="/"
         class="flex items-baseline gap-2 rounded-md outline-primary/25 focus-visible:outline-3"
@@ -38,12 +39,13 @@ const userMenu = computed(() => [
         <span class="hidden text-sm text-muted sm:inline">系统美化大赛</span>
       </NuxtLink>
 
-      <UBadge
-        :label="phaseLabel"
-        :color="isVoting ? 'primary' : 'neutral'"
-        variant="subtle"
-        size="sm"
-      />
+      <div class="flex items-center gap-2.5">
+        <span
+          class="size-2 shrink-0 rounded-full"
+          :class="isEnded ? 'bg-accented' : 'bg-primary'"
+        />
+        <span class="text-base font-bold text-highlighted">{{ phaseLabel }}</span>
+      </div>
 
       <nav class="ms-auto flex items-center gap-4 sm:gap-5">
         <NuxtLink

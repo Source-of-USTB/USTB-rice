@@ -58,13 +58,6 @@ useSeoMeta({
                 variant="subtle"
                 size="sm"
               />
-              <UBadge
-                v-if="isMe"
-                label="这是你"
-                color="neutral"
-                variant="subtle"
-                size="sm"
-              />
             </div>
           </div>
         </div>
