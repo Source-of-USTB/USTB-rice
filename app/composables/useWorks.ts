@@ -25,7 +25,7 @@ export function useWorks() {
 
   const settings = computed(() => snapshot.value.settings)
   const isUpload = computed(() => settings.value.phase === 'upload')
-  const votingOpen = computed(() => settings.value.votingOpen)
+  const isVoting = computed(() => settings.value.phase === 'voting')
 
   const entries = computed<WorkEntry[]>(() => {
     const { works, profiles, photos, scores, myVotes } = snapshot.value
@@ -295,7 +295,7 @@ export function useWorks() {
     if (!uid) {
       return { ok: false, message: '请先登录后再投票' }
     }
-    if (!votingOpen.value) {
+    if (!isVoting.value) {
       return { ok: false, message: '现在不能投票, 投票尚未开始或已经结束' }
     }
 
@@ -343,7 +343,7 @@ export function useWorks() {
     if (!uid) {
       return { ok: false, message: '请先登录' }
     }
-    if (!votingOpen.value) {
+    if (!isVoting.value) {
       return { ok: false, message: '现在不能打分, 投票尚未开始或已经结束' }
     }
 

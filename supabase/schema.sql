@@ -19,6 +19,14 @@ do $$ begin
   create type public.contest_phase as enum ('upload', 'voting');
 exception when duplicate_object then null; end $$;
 
+-- 'ended' 是后补的第三个阶段. 没有它, 投票截止之后 current_phase 只能继续答 'voting',
+-- 而 voting_open 已经关了, 两个函数对同一个时刻给出矛盾的答案.
+--
+-- 同一个事务里刚加出来的枚举值不能马上拿来用, 而整段脚本在 SQL Editor 里就是一个事务.
+-- 下面的 current_phase 因此写成 plpgsql: 它的表达式要到第一次执行才解析, 绕得过这条限制.
+-- 万一还是撞上 "unsafe use of new value", 整段再跑一遍即可, 第二遍这里是空操作.
+alter type public.contest_phase add value if not exists 'ended';
+
 do $$ begin
   create type public.user_role as enum ('player', 'judge', 'admin');
 exception when duplicate_object then null; end $$;
@@ -33,7 +41,6 @@ exception when duplicate_object then null; end $$;
 create table if not exists public.contest_settings (
   id               smallint primary key default 1 check (id = 1),
   -- 阶段默认由下面两个截止时间自动推导; 填了这一列就强制覆盖 (延期、提前开、临时冻结)
-  -- TODO: 5
   phase_override   public.contest_phase,
   upload_deadline  timestamptz   not null default now() + interval '30 days',
   voting_deadline  timestamptz   not null default now() + interval '45 days',
@@ -110,33 +117,38 @@ create index if not exists votes_voter_idx on public.votes (voter_id, kind);
 -- 这几个都用 security definer: 策略里要读 profiles/contest_settings,
 -- 如果走调用者身份会和 profiles 自己的 RLS 策略递归.
 
--- TODO: 5
+-- 当前阶段. 全站只有这一处推导阶段, 别的地方一律问它.
+--   phase_override 非空       -> 完全听管理员的
+--   now() < upload_deadline   -> upload
+--   now() < voting_deadline   -> voting
+--   其余                      -> ended
+-- 写成 plpgsql 而不是 sql: 见文件开头 alter type 那段的说明.
 create or replace function public.current_phase()
 returns public.contest_phase
-language sql stable security definer set search_path = public as $$
-  select coalesce(
-    s.phase_override,
-    case
-      when now() < s.upload_deadline then 'upload'::public.contest_phase
-      else 'voting'::public.contest_phase
-    end
-  )
-  from public.contest_settings s
-  where s.id = 1
-$$;
+language plpgsql stable security definer set search_path = public as $$
+declare
+  s public.contest_settings;
+begin
+  select * into s from public.contest_settings where id = 1;
 
--- 投票是否还开着. 自动模式下过了 voting_deadline 就自动关闭;
--- 手动设了 phase_override 就完全听管理员的, 不再看时间.
--- TODO: 7
+  if s.phase_override is not null then
+    return s.phase_override;
+  end if;
+
+  if now() < s.upload_deadline then
+    return 'upload';
+  elsif now() < s.voting_deadline then
+    return 'voting';
+  else
+    return 'ended';
+  end if;
+end $$;
+
+-- 投票是否还开着. 不再自己推一遍时间, 否则和 current_phase 会打架.
 create or replace function public.voting_open()
 returns boolean
 language sql stable security definer set search_path = public as $$
-  select case
-    when s.phase_override is not null then s.phase_override = 'voting'
-    else now() >= s.upload_deadline and now() < s.voting_deadline
-  end
-  from public.contest_settings s
-  where s.id = 1
+  select public.current_phase() = 'voting'
 $$;
 
 create or replace function public.my_role()
@@ -174,25 +186,10 @@ left join public.votes v on v.work_id = w.id
 group by w.id;
 
 
--- 前端读这个视图而不是直接读表: phase 是推导出来的, 表里没有这一列
--- TODO: 8
+-- contest_state 视图删掉了: 它只是把 current_phase() 和 contest_settings 原样拼在一起,
+-- 没有任何聚合或者脱敏, 前端直接查表 + 调一次 current_phase() 就够了.
+-- 这一句留着是为了把已经建过的视图清掉.
 drop view if exists public.contest_state;
-create view public.contest_state with (security_invoker = off) as
-select
-  s.id,
-  public.current_phase() as phase,
-  public.voting_open()   as voting_open,
-  s.phase_override,
-  s.upload_deadline,
-  s.voting_deadline,
-  s.max_photos,
-  s.max_description,
-  s.user_vote_limit,
-  s.judge_max_score,
-  s.popular_weight,
-  s.judge_weight
-from public.contest_settings s
-where s.id = 1;
 
 
 -- -------------------------------------------------------------- 触发器
@@ -546,8 +543,8 @@ create policy work_photos_object_admin_delete on storage.objects
 
 
 -- ----------------------------------------------------------------- 授权
-grant select on public.work_scores  to anon, authenticated;
-grant select on public.contest_state to anon, authenticated;
+grant select on public.work_scores to anon, authenticated;
+grant execute on function public.current_phase() to anon, authenticated;
 grant usage on schema public to anon, authenticated;
 
 

@@ -6,7 +6,7 @@ const props = defineProps<{
 }>()
 
 const toast = useToast()
-const { config, votingOpen } = useContest()
+const { config, isVoting } = useContest()
 const { setJudgeScore } = useWorks()
 
 const pending = ref<number | null>(null)
@@ -48,7 +48,7 @@ async function onScore(score: number) {
         :color="entry.myJudgeScore === score ? 'primary' : 'neutral'"
         :variant="entry.myJudgeScore === score ? 'solid' : 'outline'"
         :loading="pending === score"
-        :disabled="!votingOpen"
+        :disabled="!isVoting"
         size="sm"
         class="w-10 justify-center"
         @click="onScore(score)"

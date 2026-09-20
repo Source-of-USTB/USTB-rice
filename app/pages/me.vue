@@ -137,14 +137,15 @@ async function onSetCover(photoId: string) {
 
       <div class="flex flex-col gap-8">
         <p
-          v-if="isVoting"
+          v-if="!isUpload"
           class="m-0 flex items-start gap-2 text-sm text-muted"
         >
           <UIcon
             name="i-lucide-lock"
             class="mt-0.5 size-4 shrink-0"
           />
-          <span>已经进入投票阶段, 作品锁定了, 说明和截图都改不了。投票 {{ formatDeadline(config.votingDeadline) }} 结束。</span>
+          <span v-if="isVoting">已经进入投票阶段, 作品锁定了, 说明和截图都改不了。投票 {{ formatDeadline(config.votingDeadline) }} 结束。</span>
+          <span v-else>比赛已经结束, 作品不再接受修改。</span>
         </p>
 
         <!-- 作品说明: 每人只有一份 -->

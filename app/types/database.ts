@@ -55,11 +55,6 @@ type VoteRow = {
   created_at: string
 }
 
-type StateRow = Omit<SettingsRow, 'updated_at'> & {
-  phase: ContestPhase
-  voting_open: boolean
-}
-
 type ScoreRow = {
   work_id: string
   user_votes: number
@@ -106,12 +101,13 @@ export interface Database {
         Row: ScoreRow
         Relationships: []
       }
-      contest_state: {
-        Row: StateRow
-        Relationships: []
+    }
+    Functions: {
+      current_phase: {
+        Args: Record<string, never>
+        Returns: ContestPhase
       }
     }
-    Functions: Record<string, never>
     Enums: {
       contest_phase: ContestPhase
       user_role: UserRole

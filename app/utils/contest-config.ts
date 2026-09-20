@@ -7,7 +7,6 @@ import type { ContestSettings } from '~/types/contest'
  */
 export const DEFAULT_SETTINGS: ContestSettings = {
   phase: 'upload',
-  votingOpen: false,
   phaseOverride: null,
   uploadDeadline: '',
   votingDeadline: '',

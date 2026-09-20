@@ -6,7 +6,7 @@ useSeoMeta({
   description: '用户互投与评委打分的实时排名。'
 })
 
-const { isVoting, config } = useContest()
+const { isUpload, config } = useContest()
 const { entries, rankedEntries } = useWorks()
 
 const boardItems = [
@@ -43,7 +43,7 @@ const photoTotal = computed(() => entries.value.reduce((sum, entry) => sum + ent
     />
 
     <div
-      v-if="!isVoting"
+      v-if="isUpload"
       class="flex flex-col gap-10"
     >
       <p class="m-0 text-muted">

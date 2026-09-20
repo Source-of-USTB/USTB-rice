@@ -10,12 +10,12 @@ const props = withDefaults(defineProps<{
 
 const toast = useToast()
 const { user } = useAuth()
-const { votingOpen } = useContest()
+const { isVoting } = useContest()
 const { toggleUserVote } = useWorks()
 
 const pending = ref(false)
 const isMine = computed(() => props.entry.work.authorId === user.value?.id)
-const disabled = computed(() => isMine.value || !votingOpen.value)
+const disabled = computed(() => isMine.value || !isVoting.value)
 
 async function onVote() {
   pending.value = true
@@ -39,7 +39,7 @@ async function onVote() {
     :loading="pending"
     icon="i-lucide-heart"
     :label="String(entry.userVotes)"
-    :title="isMine ? '不能给自己的作品投票' : !votingOpen ? '投票已经结束' : entry.votedByMe ? '再次点击取消投票' : '投出一票'"
+    :title="isMine ? '不能给自己的作品投票' : !isVoting ? '投票已经结束' : entry.votedByMe ? '再次点击取消投票' : '投出一票'"
     @click="onVote()"
   />
 </template>

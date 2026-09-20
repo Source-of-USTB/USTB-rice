@@ -6,8 +6,8 @@
  * 建表语句见 supabase/schema.sql.
  */
 
-/** 比赛阶段: 上传阶段 -> 投票阶段 */
-export type ContestPhase = 'upload' | 'voting'
+/** 比赛阶段: 上传 -> 投票 -> 已结束 */
+export type ContestPhase = 'upload' | 'voting' | 'ended'
 
 /** 参赛者 / 评委 / 管理员 */
 export type UserRole = 'player' | 'judge' | 'admin'
@@ -15,12 +15,10 @@ export type UserRole = 'player' | 'judge' | 'admin'
 /** 用户互投 / 评委打分 */
 export type VoteKind = 'user' | 'judge'
 
-/** contest_state 视图读回来的比赛状态与规则 */
+/** contest_settings 那一行, 外加 current_phase() 推导出来的阶段 */
 export interface ContestSettings {
-  /** 按截止时间推导出来的当前阶段 (phaseOverride 非空时以它为准) */
+  /** 当前阶段, 由数据库的 current_phase() 说了算 (phaseOverride 非空时以它为准) */
   phase: ContestPhase
-  /** 现在能不能投票: 过了投票截止时间会自动变 false */
-  votingOpen: boolean
   /** 管理员强制指定的阶段, null 表示交给时间自动判断 */
   phaseOverride: ContestPhase | null
   /** ISO 时间戳, 精确到分钟 */

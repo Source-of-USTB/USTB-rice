@@ -5,7 +5,7 @@ const props = defineProps<{
   entry: WorkEntry
 }>()
 
-const { isVoting } = useContest()
+const { isUpload } = useContest()
 
 const cover = computed(() => props.entry.photos[0] ?? null)
 const homeLink = computed(() => `/u/${props.entry.work.authorId}`)
@@ -85,7 +85,7 @@ const summary = computed(() => props.entry.work.description.replace(/\s+/g, ' ')
         </NuxtLink>
 
         <VoteButton
-          v-if="isVoting"
+          v-if="!isUpload"
           :entry="entry"
           size="xs"
         />

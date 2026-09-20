@@ -1,12 +1,10 @@
 import type { Database } from '~/types/database'
-import type { ContestSettings, Profile, VoteKind, Work, WorkPhoto } from '~/types/contest'
+import type { ContestPhase, ContestSettings, Profile, VoteKind, Work, WorkPhoto } from '~/types/contest'
 
 /* ----------------------- 数据库返回的原始行 (snake_case) ----------------------- */
 
 interface SettingsRow {
-  phase: ContestSettings['phase']
-  voting_open: boolean
-  phase_override: ContestSettings['phase'] | null
+  phase_override: ContestPhase | null
   upload_deadline: string
   voting_deadline: string
   max_photos: number
@@ -102,8 +100,10 @@ export function useContestData() {
   const user = useSupabaseUser()
 
   const { data, status, refresh } = useAsyncData<ContestSnapshot>('contest', async () => {
-    const [settingsRes, profilesRes, worksRes, photosRes, scoresRes, votesRes] = await Promise.all([
-      supabase.from('contest_state').select('*').maybeSingle(),
+    const [phaseRes, settingsRes, profilesRes, worksRes, photosRes, scoresRes, votesRes] = await Promise.all([
+      // 阶段是推导出来的, 表里没有这一列, 单独调一次函数
+      supabase.rpc('current_phase'),
+      supabase.from('contest_settings').select('*').maybeSingle(),
       supabase.from('profiles').select('id, name, role'),
       supabase.from('works').select('id, author_id, title, description, tags, created_at, updated_at'),
       supabase.from('work_photos').select('id, work_id, storage_path, sort_order').order('sort_order'),
@@ -113,7 +113,7 @@ export function useContestData() {
         : Promise.resolve({ data: [], error: null })
     ])
 
-    const failed = [settingsRes, profilesRes, worksRes, photosRes, scoresRes, votesRes]
+    const failed = [phaseRes, settingsRes, profilesRes, worksRes, photosRes, scoresRes, votesRes]
       .find(result => result.error)
 
     if (failed?.error) {
@@ -123,8 +123,7 @@ export function useContestData() {
     const settingsRow = settingsRes.data as SettingsRow | null
     const settings: ContestSettings = settingsRow
       ? {
-          phase: settingsRow.phase,
-          votingOpen: settingsRow.voting_open,
+          phase: (phaseRes.data as ContestPhase | null) ?? DEFAULT_SETTINGS.phase,
           phaseOverride: settingsRow.phase_override,
           uploadDeadline: settingsRow.upload_deadline,
           votingDeadline: settingsRow.voting_deadline,

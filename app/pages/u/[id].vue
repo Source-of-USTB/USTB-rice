@@ -2,7 +2,7 @@
 const route = useRoute()
 const { snapshot } = useContestData()
 const { entryByAuthor } = useWorks()
-const { isVoting } = useContest()
+const { isUpload, isVoting } = useContest()
 const { user, isJudge } = useAuth()
 
 const userId = computed(() => String(route.params.id))
@@ -93,7 +93,7 @@ useSeoMeta({
 
       <template v-else>
         <section
-          v-if="isVoting"
+          v-if="!isUpload"
           class="flex flex-wrap items-end gap-x-12 gap-y-6"
         >
           <div class="flex flex-col gap-1">
