@@ -29,8 +29,12 @@ const userMenu = computed(() => [
 
 <template>
   <header class="border-b border-default">
-    <!-- 窄屏用 flex 让它自然折行, sm 以上换成三栏网格, 阶段才真的居中 -->
-    <div class="mx-auto flex w-full max-w-shell flex-wrap items-center gap-x-6 gap-y-3 px-6 py-5 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:px-8">
+    <!--
+      不套 max-w-shell: 1100px 那个上限只管正文, 页眉页脚横向撑满,
+      品牌贴最左、导航贴最右, 和 Planet-Source-of-USTB 一致.
+      窄屏用 flex 让它自然折行, sm 以上换成三栏网格, 阶段才真的居中.
+    -->
+    <div class="flex w-full flex-wrap items-center gap-x-6 gap-y-3 px-6 py-5 sm:grid sm:grid-cols-[1fr_auto_1fr] sm:px-8">
       <NuxtLink
         to="/"
         class="flex items-baseline gap-2 rounded-md outline-primary/25 focus-visible:outline-3"
