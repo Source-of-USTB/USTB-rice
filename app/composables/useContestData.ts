@@ -174,12 +174,23 @@ export function useContestData() {
     }
   }, {
     default: () => emptySnapshot(),
+    /*
+     * 只在浏览器里取数.
+     *
+     * 页面上的东西全是浏览器直接向 Supabase 要的, 服务端再跑一遍只是把同样的请求
+     * 换个地方发, 首屏并不会因此变快. 而部署在 Cloudflare Workers 上时,
+     * 单次调用能发出的出站请求是有上限的 (免费版 50), 这一轮 7 个请求乘上
+     * 多个组件各自触发的轮数, 很容易把额度打满, 整个请求直接失败.
+     */
+    server: false,
     // 登录状态变化会影响"我投过哪些票", 需要重新取
     watch: [user]
   })
 
   const snapshot = computed(() => data.value ?? emptySnapshot())
-  const loading = computed(() => status.value === 'pending')
+  // server: false 时服务端渲染出来的是 idle, 这时候还没开始取, 也该显示加载态,
+  // 否则 SSR 出去的 HTML 会先闪一下"还没有人提交作品"
+  const loading = computed(() => status.value === 'idle' || status.value === 'pending')
 
   return { snapshot, loading, refresh }
 }
