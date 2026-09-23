@@ -87,6 +87,16 @@ async function signUp() {
     return
   }
 
+  /*
+   * 邮箱已经注册过时, Supabase 不会报错 —— 为了不让人拿注册接口探测哪些邮箱存在,
+   * 它会返回一个假的 user, identities 是空数组, 并照常再发一封确认信.
+   * 这里靠 identities 长度认出这种情况, 免得用户反复点注册把每小时的邮件配额烧光.
+   */
+  if (data.user && data.user.identities?.length === 0) {
+    warn('这个邮箱已经注册过了, 直接用密码登录, 或者用邮箱链接登录')
+    return
+  }
+
   // 项目开了邮箱验证时拿不到 session, 需要用户先去收件箱点一下
   if (!data.session) {
     toast.add({
@@ -125,17 +135,6 @@ async function sendMagicLink() {
     color: 'success',
     icon: 'i-lucide-mail'
   })
-}
-
-async function signInWithGithub() {
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'github',
-    options: { redirectTo: callbackUrl() }
-  })
-
-  if (error) {
-    warn(`GitHub 登录失败: ${error.message}`)
-  }
 }
 </script>
 
@@ -321,17 +320,6 @@ async function signInWithGithub() {
           </form>
         </template>
       </UTabs>
-
-      <USeparator label="或者" />
-
-      <UButton
-        label="使用 GitHub 登录"
-        icon="i-simple-icons-github"
-        color="neutral"
-        variant="outline"
-        block
-        @click="signInWithGithub()"
-      />
 
       <p class="m-0 text-center text-xs text-dimmed">
         建议使用校内邮箱, 方便评委核对参赛身份。
