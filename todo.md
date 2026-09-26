@@ -42,6 +42,6 @@
 
 21. cloudflared 隧道指向 http://localhost:3000, 内网走 http://<服务器IP>:3000, 两条路同一个进程
 
-22. 挂上社团域名之后要去 Supabase 的 Auth → URL Configuration 改 Site URL, 并把 https://<社团域名>/confirm 加进 Redirect URLs; 想让内网 IP 那条也能登录就把 http://<服务器IP>:3000/confirm 一起加上, 不加的话 GitHub 登录和邮箱链接回跳会被拒
+22. ~~挂上社团域名之后要去 Supabase 的 Auth → URL Configuration 改 Site URL, 并把 https://<社团域名>/confirm 加进 Redirect URLs; 想让内网 IP 那条也能登录就把 http://<服务器IP>:3000/confirm 一起加上, 不加的话 GitHub 登录和邮箱链接回跳会被拒~~
 
 23. 手机端只保证了不横向溢出, 断点和折行都写了, 但没在真机上量过间距和点击区域, 上线前找台手机过一遍
