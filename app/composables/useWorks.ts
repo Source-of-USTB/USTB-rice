@@ -242,7 +242,12 @@ export function useWorks() {
       : { ok: true, message: `已上传 ${accepted.length} 张照片` }
   }
 
-  /** 删除自己的某张照片 */
+  /**
+   * 删除自己的某张照片: 先删 Storage 里的文件, 再删 work_photos.
+   *
+   * 顺序不能反. storage.objects 的删除策略要回头核对这条记录还在且属于你,
+   * 记录先删了文件就再也删不掉. 中途失败最多留一张碎图, 再点一次删除即可.
+   */
   async function removeMyPhoto(photoId: string): Promise<ActionResult> {
     if (!isUpload.value) {
       return { ok: false, message: '投票阶段作品已锁定, 无法删除' }
@@ -253,10 +258,20 @@ export function useWorks() {
       return { ok: false, message: '照片不存在' }
     }
 
-    // Storage 里的文件由 work_photos 上的 after delete 触发器顺手带走, 这里不用再删一次
-    const { error } = await supabase.from('work_photos').delete().eq('id', photoId)
+    // 被策略挡住时 remove 不报错, 只是返回空数组. 不在这里判断: 文件本来就不存在
+    // (当初上传失败) 时也是空数组, 这种记录正该删掉; 而权限不够的话下面删记录同样会被挡
+    const removed = await supabase.storage.from(PHOTO_BUCKET).remove([photoPath(target.workId, photoId)])
+    if (removed.error) {
+      return failed(removed.error, '删除失败')
+    }
+
+    const { data, error } = await supabase.from('work_photos').delete().eq('id', photoId).select('id')
     if (error) {
       return failed(error, '删除失败')
+    }
+    if (data.length === 0) {
+      await refresh()
+      return { ok: false, message: '删除失败, 没有权限或照片已不存在' }
     }
 
     await refresh()

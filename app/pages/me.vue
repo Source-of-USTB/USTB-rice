@@ -114,10 +114,26 @@ function onDrop(event: DragEvent) {
   void handleFiles(Array.from(event.dataTransfer?.files ?? []))
 }
 
-async function onRemovePhoto(photoId: string) {
+const pendingRemovePhotoId = ref<string | null>(null)
+
+const confirmRemovePhoto = computed({
+  get: () => pendingRemovePhotoId.value !== null,
+  set: (open) => {
+    if (!open) {
+      pendingRemovePhotoId.value = null
+    }
+  }
+})
+
+async function onRemovePhoto() {
+  const photoId = pendingRemovePhotoId.value
+  if (!photoId) {
+    return
+  }
   busyPhotoId.value = photoId
   report(await removeMyPhoto(photoId))
   busyPhotoId.value = null
+  pendingRemovePhotoId.value = null
 }
 
 async function onSetCover(photoId: string) {
@@ -429,7 +445,7 @@ async function onSetCover(photoId: string) {
                   color="error"
                   variant="solid"
                   :loading="busyPhotoId === photo.id"
-                  @click="onRemovePhoto(photo.id)"
+                  @click="pendingRemovePhotoId = photo.id"
                 />
               </figcaption>
             </figure>
@@ -464,6 +480,30 @@ async function onSetCover(photoId: string) {
               icon="i-lucide-trash-2"
               :loading="saving"
               @click="onDeleteText()"
+            />
+          </div>
+        </template>
+      </UModal>
+
+      <UModal
+        v-model:open="confirmRemovePhoto"
+        title="删除这张截图"
+        description="删除后无法恢复, 如果它是封面, 下一张会顶上来。"
+      >
+        <template #footer>
+          <div class="flex w-full justify-end gap-2">
+            <UButton
+              label="取消"
+              color="neutral"
+              variant="outline"
+              @click="confirmRemovePhoto = false"
+            />
+            <UButton
+              label="确认删除"
+              color="error"
+              icon="i-lucide-trash-2"
+              :loading="busyPhotoId !== null"
+              @click="onRemovePhoto()"
             />
           </div>
         </template>

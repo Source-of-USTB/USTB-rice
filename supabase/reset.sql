@@ -14,6 +14,9 @@
 -- ------------------------------------------------------- 别的 schema 里的
 -- 这几样挂在 storage 和 auth 上, 删 public 的表带不走它们.
 
+-- storage.objects 上有 protect_delete 触发器, SQL 直删必须先开这个开关.
+-- 这样只删掉元数据, S3 里的文件还在. 桶里有文件的话先去控制台 Storage 页面清空桶再跑.
+set local storage.allow_delete_query = 'true';
 delete from storage.objects where bucket_id = 'work-photos';
 delete from storage.buckets where id = 'work-photos';
 

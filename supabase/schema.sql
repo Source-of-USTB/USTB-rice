@@ -317,26 +317,13 @@ create trigger work_photos_enforce_limit
   before insert on public.work_photos
   for each row execute function public.enforce_photo_limit();
 
--- 删记录的同时把 Storage 里的文件删掉. 不删的话文件成了没人引用的孤儿,
--- 而桶是公开的, 谁手上有旧链接就还能一直下载.
---
--- 键只用 old 这一行自己的两列拼, 不去查父表: 级联删除 (删作品、删账号) 触发到这里时,
--- 父行已经没了, 查回来是空的, 而级联恰恰是最需要清理的那个场景.
--- security definer 是为了绕开 storage.objects 上的 RLS.
-create or replace function public.delete_photo_object()
-returns trigger language plpgsql security definer set search_path = public as $$
-begin
-  delete from storage.objects
-  where bucket_id = 'work-photos'
-    and name = old.work_id::text || '/' || old.id::text;
-
-  return old;
-end $$;
-
+-- 旧版本在这里挂了一个 after delete 触发器, 用 SQL 直接删 storage.objects 里的文件.
+-- Supabase 后来给 storage.objects 加了 protect_delete 触发器, SQL 直删一律报 42501,
+-- 连带整个事务回滚, 用户就删不掉自己的照片了. 就算设 storage.allow_delete_query 绕过去,
+-- 删掉的也只是元数据行, S3 里的文件还在. 文件只能走 Storage API 删, 见前端 removeMyPhoto.
+-- 这两句是为了把旧版本建过的触发器清掉.
 drop trigger if exists work_photos_delete_object on public.work_photos;
-create trigger work_photos_delete_object
-  after delete on public.work_photos
-  for each row execute function public.delete_photo_object();
+drop function if exists public.delete_photo_object();
 
 -- 投票规则: 阶段、不能投自己、重复投票、票数上限、评委身份、分数范围.
 -- 只挂在 insert 上: 票没有"改"这个操作, 换目标或者改分都是先撤再投.
@@ -465,10 +452,16 @@ create policy works_update_own on public.works
   using (author_id = (select auth.uid()) and public.current_phase() = 'upload')
   with check (author_id = (select auth.uid()));
 
+-- 还有截图时不让删: 级联会带走 work_photos 记录, 但 Storage 里的文件没人删, 成了孤儿.
+-- 前端 deleteMyText 本来也只在没有截图时才删整行.
 drop policy if exists works_delete_own on public.works;
 create policy works_delete_own on public.works
   for delete to authenticated
-  using (author_id = (select auth.uid()) and public.current_phase() = 'upload');
+  using (
+    author_id = (select auth.uid())
+    and public.current_phase() = 'upload'
+    and not exists (select 1 from public.work_photos p where p.work_id = works.id)
+  );
 
 -- work_photos: 所有人可读, 只能在上传阶段动自己作品下的截图
 drop policy if exists work_photos_read on public.work_photos;
@@ -579,10 +572,23 @@ create policy work_photos_object_insert on storage.objects
     )
   );
 
--- 普通用户不再直接删对象: 文件的生命周期跟着记录走, 删记录由上面那个
--- after delete 触发器顺手把文件带走. 留着这条策略只会多出"文件删了记录还在"
--- 这一种页面挂碎图的姿势. 这一句是为了把旧版本建过的策略清掉.
+-- 删自己的截图: 条件和上面的插入策略对称, 键必须对得上自己名下仍然存在的那条记录.
+-- 所以前端必须先删文件再删记录, 顺序反了记录没了, 这条策略就认不出文件是谁的.
+-- Storage API 的删除带 returning, 还要能 select 到这一行, 上面的读策略已经覆盖.
 drop policy if exists work_photos_object_delete on storage.objects;
+create policy work_photos_object_delete on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'work-photos'
+    and public.current_phase() = 'upload'
+    and exists (
+      select 1
+      from public.work_photos p
+      join public.works w on w.id = p.work_id
+      where w.author_id = (select auth.uid())
+        and name = w.id::text || '/' || p.id::text
+    )
+  );
 
 -- 管理员撤下违规截图. 不看阶段: 投票期间发现问题也得能删.
 -- 同一条命令上的多条 permissive 策略是 or 关系, 这条只是在上面那条之外多开一个口子.
