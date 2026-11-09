@@ -68,10 +68,10 @@ SUPABASE_KEY=
 ## 计分方式
 
 ```txt
-综合分 = 人气分 * popular_weight + 评委分 * judge_weight
+综合分 = Agent 分 * agent_weight + 评委分 * judge_weight + 人气分 * popular_weight
 ```
 
-人气分按当前最高票归一化，评委分取所有评委打分的平均值。两个权重、截图张数上限、说明字数和每人票数都来自 `contest_settings`。
+三项都先换算到 100 分：Agent 分本身就是 0 ~ 100，由管理员填进 `agent_scores`；评委分取所有评委打分的平均值；人气分按当前最高票归一化。默认权重 0.3 / 0.4 / 0.3，三个权重、截图张数上限、说明字数和每人票数都来自 `contest_settings`。
 
 ## 构建
 

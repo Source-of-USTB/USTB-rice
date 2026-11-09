@@ -68,10 +68,10 @@ Every rule is enforced in the database as well as the UI. Disabled buttons are c
 ## Scoring
 
 ```txt
-total = popularity * popular_weight + judges * judge_weight
+total = agent * agent_weight + judges * judge_weight + popularity * popular_weight
 ```
 
-Popularity is normalised against the current highest vote count. The judge score is the average of every judge's score. Both weights, the photo limit, the description length and the vote budget come from `contest_settings`.
+All three are scaled to 100 first. The agent score is already 0 to 100 and is filled into `agent_scores` by an admin. The judge score is the average of every judge's score. Popularity is normalised against the current highest vote count. The default weights are 0.3 / 0.4 / 0.3; all three, the photo limit, the description length and the vote budget come from `contest_settings`.
 
 ## Build
 

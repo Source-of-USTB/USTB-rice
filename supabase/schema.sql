@@ -51,18 +51,41 @@ create table if not exists public.contest_settings (
   max_description  smallint      not null default 800,
   user_vote_limit  smallint      not null default 3,
   judge_max_score  smallint      not null default 10,
-  popular_weight   numeric(3, 2) not null default 0.40,
-  judge_weight     numeric(3, 2) not null default 0.60,
+  popular_weight   numeric(3, 2) not null default 0.30,
+  judge_weight     numeric(3, 2) not null default 0.40,
+  agent_weight     numeric(3, 2) not null default 0.30,
   updated_at       timestamptz   not null default now()
 );
 
--- 两个权重加起来必须正好是 1, 否则综合分的满分就不是 100.
+-- 给只有两个权重的旧库补上 agent_weight, 并改成公众号公布的 3 : 4 : 3.
+-- 只在这一列还不存在时跑一次, 重跑脚本不会把管理员后来改过的权重冲掉.
+-- 旧的求和约束只认两个权重, 加列之前先拆掉, 下面再按三个权重重建.
+-- 列默认值也要跟着改: 文件末尾那句 insert ... on conflict do nothing 虽然撞主键什么都不插,
+-- 但 check 约束是在判冲突之前拿"按默认值拼出来的那一行"去验的, 0.40 + 0.60 + 0.30 过不去.
+do $$ begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'contest_settings' and column_name = 'agent_weight'
+  ) then
+    alter table public.contest_settings drop constraint if exists contest_settings_weight_sum;
+    alter table public.contest_settings
+      add column agent_weight numeric(3, 2) not null default 0.30,
+      alter column popular_weight set default 0.30,
+      alter column judge_weight set default 0.40;
+    update public.contest_settings set popular_weight = 0.30, judge_weight = 0.40 where id = 1;
+  end if;
+end $$;
+
+-- 三个权重加起来必须正好是 1, 否则综合分的满分就不是 100.
 -- 放在 alter 里而不是上面的 create table 里: 表已经建过的话 create table if not exists
 -- 会整段跳过, 约束加不上去.
 do $$ begin
   alter table public.contest_settings
     add constraint contest_settings_weight_sum
-    check (popular_weight >= 0 and judge_weight >= 0 and popular_weight + judge_weight = 1);
+    check (
+      popular_weight >= 0 and judge_weight >= 0 and agent_weight >= 0
+      and popular_weight + judge_weight + agent_weight = 1
+    );
 exception when duplicate_object then null; end $$;
 
 insert into public.contest_settings (id) values (1) on conflict (id) do nothing;
@@ -117,6 +140,16 @@ create table if not exists public.votes (
 
 create index if not exists votes_work_idx on public.votes (work_id);
 create index if not exists votes_voter_idx on public.votes (voter_id, kind);
+
+-- Agent 评分: 每份作品一个, 直接是 0 ~ 100 的分数. 来源还没定, 目前由管理员在 SQL Editor 里填:
+--   insert into public.agent_scores (work_id, score) values ('<作品 uuid>', 85)
+--   on conflict (work_id) do update set score = excluded.score;
+-- 单独建表而不是给 works 加一列: works 的作者在上传阶段能改自己那一行, 放在那里就能给自己打分.
+create table if not exists public.agent_scores (
+  work_id    uuid primary key references public.works (id) on delete cascade,
+  score      numeric(5, 2) not null check (score between 0 and 100),
+  updated_at timestamptz not null default now()
+);
 
 
 -- ------------------------------------------------------------ 辅助函数
@@ -200,7 +233,8 @@ select
   w.id                                                        as work_id,
   count(v.id) filter (where v.kind = 'user')::int             as user_votes,
   avg(v.score) filter (where v.kind = 'judge')::numeric(4, 2) as judge_score,
-  count(v.id) filter (where v.kind = 'judge')::int            as judge_count
+  count(v.id) filter (where v.kind = 'judge')::int            as judge_count,
+  (select a.score from public.agent_scores a where a.work_id = w.id) as agent_score
 from public.works w
 left join public.votes v on v.work_id = w.id
 group by w.id;
@@ -411,6 +445,7 @@ alter table public.profiles         enable row level security;
 alter table public.works            enable row level security;
 alter table public.work_photos      enable row level security;
 alter table public.votes            enable row level security;
+alter table public.agent_scores     enable row level security;
 
 -- contest_settings: 所有人可读, 只有管理员能改
 drop policy if exists contest_settings_read on public.contest_settings;
@@ -525,6 +560,15 @@ drop policy if exists votes_delete_own_user on public.votes;
 drop policy if exists votes_delete_own on public.votes;
 create policy votes_delete_own on public.votes
   for delete to authenticated using (voter_id = (select auth.uid()));
+
+-- agent_scores: 所有人可读, 只有管理员能写. SQL Editor 里不走 RLS, 直接填就行
+drop policy if exists agent_scores_read on public.agent_scores;
+create policy agent_scores_read on public.agent_scores
+  for select to anon, authenticated using (true);
+
+drop policy if exists agent_scores_admin_write on public.agent_scores;
+create policy agent_scores_admin_write on public.agent_scores
+  for all to authenticated using (public.is_admin());
 
 
 -- --------------------------------------------------------------- 存储桶

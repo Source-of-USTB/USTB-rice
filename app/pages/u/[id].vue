@@ -100,6 +100,12 @@ useSeoMeta({
             <span class="text-sm text-muted">评委评分</span>
           </div>
           <div class="flex flex-col gap-1">
+            <span class="text-3xl leading-none font-bold tabular-nums text-highlighted">
+              {{ entry.agentScore === null ? '—' : formatScore(entry.agentScore) }}
+            </span>
+            <span class="text-sm text-muted">Agent 评分</span>
+          </div>
+          <div class="flex flex-col gap-1">
             <span class="text-3xl leading-none font-bold tabular-nums text-primary">{{ formatScore(entry.totalScore) }}</span>
             <span class="text-sm text-muted">综合得分</span>
           </div>

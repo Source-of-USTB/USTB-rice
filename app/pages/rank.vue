@@ -39,7 +39,7 @@ const photoTotal = computed(() => entries.value.reduce((sum, entry) => sum + ent
   <div>
     <PageHeading
       title="排行榜"
-      description="综合分由同学们的投票和评委打分共同决定, 投票阶段实时更新。"
+      description="综合分由 Agent 评分、评委打分和同学们的投票共同决定, 投票阶段实时更新。"
     />
 
     <div
@@ -160,6 +160,9 @@ const photoTotal = computed(() => entries.value.reduce((sum, entry) => sum + ent
               <th class="py-3 pe-6 text-right font-normal">
                 评委分
               </th>
+              <th class="py-3 pe-6 text-right font-normal">
+                Agent 分
+              </th>
               <th class="py-3 text-right font-normal">
                 综合分
               </th>
@@ -198,6 +201,9 @@ const photoTotal = computed(() => entries.value.reduce((sum, entry) => sum + ent
               <td class="py-3 pe-6 text-right tabular-nums text-toned">
                 {{ entry.judgeScore === null ? '—' : formatScore(entry.judgeScore) }}
               </td>
+              <td class="py-3 pe-6 text-right tabular-nums text-toned">
+                {{ entry.agentScore === null ? '—' : formatScore(entry.agentScore) }}
+              </td>
               <td class="py-3 text-right font-bold tabular-nums text-primary">
                 {{ formatScore(entry.totalScore) }}
               </td>
@@ -205,11 +211,8 @@ const photoTotal = computed(() => entries.value.reduce((sum, entry) => sum + ent
           </tbody>
         </table>
       </section>
-
-      <p class="m-0 text-sm text-dimmed">
-        综合分 = 人气分 × {{ config.popularWeight * 100 }}% + 评委分 × {{ config.judgeWeight * 100 }}%。
-        人气分按当前最高票归一化到 100 分, 评委分为所有评委打分的平均值 (满分 {{ config.judgeMaxScore }} 分) 换算到 100 分。
-      </p>
     </div>
+
+    <ScoringRules class="mt-12 border-t border-default pt-8" />
   </div>
 </template>

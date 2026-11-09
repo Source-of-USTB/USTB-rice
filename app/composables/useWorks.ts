@@ -41,9 +41,12 @@ export function useWorks() {
       const score = scoreOf.get(work.id)
       const userVotes = score?.userVotes ?? 0
       const judgeScore = score?.judgeScore ?? null
+      const agentScore = score?.agentScore ?? null
 
+      // 三项先各自换算到 100 分再按权重相加: 票数和 1 ~ 10 分不是一个单位, 直接加没有意义
       const popularPoints = (userVotes / topUserVotes) * 100
       const judgePoints = ((judgeScore ?? 0) / settings.value.judgeMaxScore) * 100
+      const agentPoints = agentScore ?? 0
 
       return {
         work,
@@ -52,7 +55,10 @@ export function useWorks() {
         userVotes,
         judgeScore,
         judgeCount: score?.judgeCount ?? 0,
-        totalScore: popularPoints * settings.value.popularWeight + judgePoints * settings.value.judgeWeight,
+        agentScore,
+        totalScore: agentPoints * settings.value.agentWeight
+          + judgePoints * settings.value.judgeWeight
+          + popularPoints * settings.value.popularWeight,
         votedByMe: myUserVotes.has(work.id),
         myJudgeScore: myJudgeScores.get(work.id) ?? null
       }

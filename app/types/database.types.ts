@@ -18,6 +18,7 @@ type SettingsRow = {
   judge_max_score: number
   popular_weight: number
   judge_weight: number
+  agent_weight: number
   updated_at: string
 }
 
@@ -54,11 +55,18 @@ type VoteRow = {
   created_at: string
 }
 
+type AgentScoreRow = {
+  work_id: string
+  score: number
+  updated_at: string
+}
+
 type ScoreRow = {
   work_id: string
   user_votes: number
   judge_score: number | null
   judge_count: number
+  agent_score: number | null
 }
 
 export interface Database {
@@ -92,6 +100,12 @@ export interface Database {
         Row: VoteRow
         Insert: Pick<VoteRow, 'work_id' | 'voter_id' | 'kind'> & Partial<VoteRow>
         Update: Partial<VoteRow>
+        Relationships: []
+      }
+      agent_scores: {
+        Row: AgentScoreRow
+        Insert: Pick<AgentScoreRow, 'work_id' | 'score'> & Partial<AgentScoreRow>
+        Update: Partial<AgentScoreRow>
         Relationships: []
       }
     }

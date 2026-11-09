@@ -30,6 +30,11 @@ export function formatDeadline(iso: string): string {
   return DEADLINE_FORMAT.format(date).replace(/\//g, '-')
 }
 
+/** 权重转百分比. 要先取整: 0.3 * 100 在浮点里是 30.000000000000004 */
+export function formatPercent(weight: number): string {
+  return `${Math.round(weight * 100)}%`
+}
+
 /** 保留一位小数, 整数则不显示小数点 */
 export function formatScore(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1)

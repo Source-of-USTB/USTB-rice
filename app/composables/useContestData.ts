@@ -13,6 +13,7 @@ interface SettingsRow {
   judge_max_score: number
   popular_weight: string | number
   judge_weight: string | number
+  agent_weight: string | number
 }
 
 interface ProfileRow {
@@ -42,6 +43,7 @@ interface ScoreRow {
   user_votes: number | null
   judge_score: string | number | null
   judge_count: number | null
+  agent_score: string | number | null
 }
 
 interface VoteRow {
@@ -57,6 +59,7 @@ export interface WorkScore {
   userVotes: number
   judgeScore: number | null
   judgeCount: number
+  agentScore: number | null
 }
 
 export interface MyVote {
@@ -106,7 +109,7 @@ export function useContestData() {
       supabase.from('profiles').select('id, name, role'),
       supabase.from('works').select('id, author_id, title, description, tags, created_at, updated_at'),
       supabase.from('work_photos').select('id, work_id, sort_order').order('sort_order'),
-      supabase.from('work_scores').select('work_id, user_votes, judge_score, judge_count'),
+      supabase.from('work_scores').select('work_id, user_votes, judge_score, judge_count, agent_score'),
       user.value
         ? supabase.from('votes').select('work_id, kind, score')
         : Promise.resolve({ data: [], error: null })
@@ -131,7 +134,8 @@ export function useContestData() {
           userVoteLimit: settingsRow.user_vote_limit,
           judgeMaxScore: settingsRow.judge_max_score,
           popularWeight: Number(settingsRow.popular_weight),
-          judgeWeight: Number(settingsRow.judge_weight)
+          judgeWeight: Number(settingsRow.judge_weight),
+          agentWeight: Number(settingsRow.agent_weight)
         }
       : DEFAULT_SETTINGS
 
@@ -163,7 +167,8 @@ export function useContestData() {
         workId: row.work_id,
         userVotes: row.user_votes ?? 0,
         judgeScore: row.judge_score === null ? null : Number(row.judge_score),
-        judgeCount: row.judge_count ?? 0
+        judgeCount: row.judge_count ?? 0,
+        agentScore: row.agent_score === null ? null : Number(row.agent_score)
       })),
       myVotes: ((votesRes.data ?? []) as VoteRow[]).map(row => ({
         workId: row.work_id,

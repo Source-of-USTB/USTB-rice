@@ -30,6 +30,7 @@ export interface ContestSettings {
   judgeMaxScore: number
   popularWeight: number
   judgeWeight: number
+  agentWeight: number
 }
 
 /** profiles 表 */
@@ -69,7 +70,9 @@ export interface WorkEntry {
   judgeScore: number | null
   /** 已打分的评委人数 */
   judgeCount: number
-  /** 综合分 = 人气分 × popularWeight + 评委分 × judgeWeight, 满分 100 */
+  /** Agent 评分, 满分 100, 还没填时为 null */
+  agentScore: number | null
+  /** 综合分 = Agent 分 × agentWeight + 评委分 × judgeWeight + 人气分 × popularWeight, 满分 100 */
   totalScore: number
   /** 当前登录用户是否投过票 */
   votedByMe: boolean

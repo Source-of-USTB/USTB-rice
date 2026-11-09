@@ -31,6 +31,7 @@ drop trigger if exists on_auth_user_created on auth.users;
 -- ---------------------------------------------------------------- 表和视图
 -- cascade 顺手带走索引、表上的策略和触发器.
 
+drop table if exists public.agent_scores     cascade;
 drop table if exists public.votes            cascade;
 drop table if exists public.work_photos      cascade;
 drop table if exists public.works            cascade;

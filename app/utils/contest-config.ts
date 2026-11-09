@@ -14,8 +14,9 @@ export const DEFAULT_SETTINGS: ContestSettings = {
   maxDescription: 800,
   userVoteLimit: 3,
   judgeMaxScore: 10,
-  popularWeight: 0.4,
-  judgeWeight: 0.6
+  popularWeight: 0.3,
+  judgeWeight: 0.4,
+  agentWeight: 0.3
 }
 
 /** 截图存放的 Storage 桶 */
